@@ -1,4 +1,4 @@
-# AegisAI: AI Governance Operating System for Banking
+# Aegis AI: AI Governance Operating System for Banking
 
 AegisAI is an enterprise-grade AI Governance Operating System designed to supervise, monitor, stress-test, explain, and audit autonomous AI agents operating in banking environments. It ensures real-time compliance, risk mitigations, transactional trust scoring, and explainability for financial systems.
 
