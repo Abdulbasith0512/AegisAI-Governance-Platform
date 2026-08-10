@@ -98,7 +98,9 @@ export default function ResearchDashboard() {
   };
 
   useEffect(() => {
-    fetchData();
+    Promise.resolve().then(() => {
+      fetchData();
+    });
   }, []);
 
   // Simulate dynamic V2 consensus
@@ -148,11 +150,13 @@ export default function ResearchDashboard() {
       const consensus_confidence = totalWeight > 0 ? approval_weighted_sum / totalWeight : 1.0;
       const stability = 1.0 - Math.abs(consensus_confidence - 0.5) * 2.0;
 
-      setConsensusResult({
-        verdict: consensus_confidence >= 0.5 ? "approve" : "decline",
-        consensus_confidence: parseFloat(consensus_confidence.toFixed(4)),
-        decision_stability: parseFloat((1.0 - stability).toFixed(3)),
-        confidence_matrix
+      Promise.resolve().then(() => {
+        setConsensusResult({
+          verdict: consensus_confidence >= 0.5 ? "approve" : "decline",
+          consensus_confidence: parseFloat(consensus_confidence.toFixed(4)),
+          decision_stability: parseFloat((1.0 - stability).toFixed(3)),
+          confidence_matrix
+        });
       });
     }
   }, [agentVotes, reputation]);

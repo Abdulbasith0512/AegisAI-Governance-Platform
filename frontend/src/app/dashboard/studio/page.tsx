@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Network, Play, FileEdit, Trash2, Loader2, GitBranch, Settings } from "lucide-react";
+import { Plus, Network, Play, FileEdit, Loader2 } from "lucide-react";
 import { ToastBar } from "@/components/ui/ToastBar";
 
 const TEXT_PRIMARY = "var(--text-1)";
@@ -49,7 +49,9 @@ export default function AIStudioDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchWorkflows();
+    (async () => {
+      await fetchWorkflows();
+    })();
   }, [fetchWorkflows]);
 
   const handleCreateWorkflow = async () => {

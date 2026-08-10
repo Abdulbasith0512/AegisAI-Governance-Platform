@@ -67,11 +67,42 @@ function getAgentColor(name: string): string {
   return "from-yellow-500 to-lime-400";
 }
 
+interface AgentReputation {
+  agent: string;
+  rep: number;
+  weight: number;
+  color: string;
+}
+
+interface ConsensusEntry {
+  id: string;
+  tx_ref: string;
+  verdict: string;
+  score: number;
+  override: boolean;
+  disagreed: string[];
+  date: string;
+}
+
+interface ConsensusApiItem {
+  id: string;
+  transaction_id: string;
+  decision_verdict: string;
+  consensus_score: number;
+  created_at: string;
+  vote_details?: {
+    disagreed_agents?: string[];
+    compliance_override_triggered?: boolean;
+    reputations?: Record<string, number>;
+    normalized_weights?: Record<string, number>;
+  };
+}
+
 export default function ConsensusDashboard() {
-  const [reputations, setReputations] = useState<any[]>(SIMULATED_REPUTATIONS);
-  const [history, setHistory] = useState<any[]>([]);
-  const [selectedAudit, setSelectedAudit] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [reputations, setReputations] = useState<AgentReputation[]>(SIMULATED_REPUTATIONS);
+  const [history, setHistory] = useState<ConsensusEntry[]>([]);
+  const [selectedAudit, setSelectedAudit] = useState<ConsensusEntry | null>(null);
+  const [_loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadConsensusData() {
@@ -79,7 +110,7 @@ export default function ConsensusDashboard() {
         const res = await fetch("http://localhost:8000/api/v1/consensus/history");
         if (res.ok) {
           const data = await res.json();
-          const mappedHistory = data.map((item: any) => {
+          const mappedHistory = data.map((item: ConsensusApiItem) => {
             const disagreed = item.vote_details?.disagreed_agents || [];
             return {
               id: item.id,

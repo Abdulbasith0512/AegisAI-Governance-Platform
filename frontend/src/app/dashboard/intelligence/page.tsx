@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   ShieldCheck, BarChart3, Trophy, Activity, AlertOctagon, 
   FileText, Download, Play, RefreshCw, Layers, ShieldAlert, CheckCircle2
@@ -21,7 +21,7 @@ export default function IntelligenceDashboard() {
   // Telemetry fetching
   const loadIntelligence = async () => {
     try {
-      setLoading(true);
+      Promise.resolve().then(() => setLoading(true));
       const [rScore, rRep, rMat, rFail, rBench, rReps] = await Promise.all([
         fetch("http://localhost:8000/api/v1/intelligence/governance-score").then(r => r.json()),
         fetch("http://localhost:8000/api/v1/intelligence/reputation").then(r => r.json()),
@@ -82,6 +82,8 @@ export default function IntelligenceDashboard() {
     loadIntelligence();
   }, []);
 
+  const nextReportId = useRef(0);
+
   const triggerReportGeneration = async (type: string, format: string) => {
     try {
       const res = await fetch("http://localhost:8000/api/v1/intelligence/report/generate", {
@@ -97,7 +99,7 @@ export default function IntelligenceDashboard() {
     } catch (err) {
       // local sandbox mock creation
       const mockReport = {
-        id: `rep-${Math.random().toString(36).slice(2, 8)}`,
+        id: `rep-${nextReportId.current++}`,
         report_type: type,
         report_format: format,
         summary: `Executive summary report generated manually in format: ${format}.`,

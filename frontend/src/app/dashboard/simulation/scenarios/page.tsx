@@ -2,12 +2,18 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Play, Settings, Database, ServerCrash, Users, AlertTriangle } from "lucide-react";
+import { Save, Settings, Database, ServerCrash } from "lucide-react";
 import { ToastBar } from "@/components/ui/ToastBar";
+
+interface Toast {
+  id: string;
+  type: string;
+  message: string;
+}
 
 export default function ScenarioBuilder() {
   const router = useRouter();
-  const [toasts, setToasts] = useState<any[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   
   const [formData, setFormData] = useState({
     name: "New Stress Test",
@@ -49,7 +55,7 @@ export default function ScenarioBuilder() {
       } else {
         throw new Error("Failed to save");
       }
-    } catch (err) {
+    } catch (_err: unknown) {
       setToasts([{ id: "err", type: "error", message: "Failed to save scenario." }]);
     }
   };
@@ -84,7 +90,7 @@ export default function ScenarioBuilder() {
         {/* Basic Info */}
         <Section title="Basic Information" icon={<Settings />}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <Input label="Scenario Name" value={formData.name} onChange={(v: any) => setFormData({...formData, name: v})} />
+            <Input label="Scenario Name" value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} />
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>Simulation Type</label>
               <select 
@@ -98,7 +104,7 @@ export default function ScenarioBuilder() {
               </select>
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
-              <Input label="Description" value={formData.description} onChange={(v: any) => setFormData({...formData, description: v})} />
+              <Input label="Description" value={formData.description} onChange={(v: string) => setFormData({...formData, description: v})} />
             </div>
           </div>
         </Section>
@@ -106,8 +112,8 @@ export default function ScenarioBuilder() {
         {/* Load & Data Generation */}
         <Section title="Traffic & Load Profile" icon={<Database />}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-            <Input label="Transactions to Generate" type="number" value={formData.num_transactions} onChange={(v: any) => setFormData({...formData, num_transactions: Number(v)})} />
-            <Input label="Target TPS (Load)" type="number" value={formData.target_tps} onChange={(v: any) => setFormData({...formData, target_tps: Number(v)})} />
+            <Input label="Transactions to Generate" type="number" value={formData.num_transactions} onChange={(v: string) => setFormData({...formData, num_transactions: Number(v)})} />
+            <Input label="Target TPS (Load)" type="number" value={formData.target_tps} onChange={(v: string) => setFormData({...formData, target_tps: Number(v)})} />
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>AML Background Risk</label>
               <select 
@@ -165,7 +171,7 @@ export default function ScenarioBuilder() {
   );
 }
 
-function Section({ title, icon, children }: any) {
+function Section({ title, icon, children }: { title: string; icon: React.ReactElement; children: React.ReactNode }) {
   return (
     <div style={{ background: "var(--surface-2)", border: "1px solid var(--border-1)", borderRadius: "12px", padding: 24 }}>
       <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1)", display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
@@ -176,7 +182,7 @@ function Section({ title, icon, children }: any) {
   );
 }
 
-function Input({ label, value, onChange, type = "text" }: any) {
+function Input({ label, value, onChange, type = "text" }: { label: string; value: string | number; onChange: (v: string) => void; type?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{label}</label>
@@ -190,7 +196,7 @@ function Input({ label, value, onChange, type = "text" }: any) {
   );
 }
 
-function Checkbox({ label, checked, onChange }: any) {
+function Checkbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
     <label style={{ 
       display: "flex", alignItems: "center", gap: 12, padding: "12px", 

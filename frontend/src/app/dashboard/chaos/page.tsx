@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactFlow, {
   Background, Controls,
   useNodesState, useEdgesState,
@@ -126,6 +126,8 @@ export default function ChaosEngineering() {
   const [runningId, setRunningId] = useState<string | null>('exp-4');
   const [toasts, setToasts] = useState<any[]>([]);
 
+  const nextToastId = useRef(0);
+
   const runExperiment = (id: string) => {
     const exp = experiments.find(e => e.id === id);
     if (!exp) return;
@@ -136,7 +138,7 @@ export default function ChaosEngineering() {
     );
 
     // Toast feedback
-    const toastId = Math.random().toString();
+    const toastId = `toast-${nextToastId.current++}`;
     setToasts(prev => [...prev, {
       id: toastId,
       type: "info",

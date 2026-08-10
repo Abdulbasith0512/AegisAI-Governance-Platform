@@ -17,11 +17,18 @@ export default function Analytics() {
   const [chartType, setChartType] = useState('Area');
   const [days, setDays] = useState(30);
 
-  const data = generateTimeSeriesData(days, 60000, 10000).map((d, i) => ({
-    label: new Date(d.ts).toLocaleDateString('en', { month: 'short', day: 'numeric' }),
-    value: d.value,
-    comparison: d.value * (0.85 + Math.random() * 0.3),
-  }));
+  const data = React.useMemo(() => {
+    return generateTimeSeriesData(days, 60000, 10000).map((d, i) => {
+      const sinVal = Math.sin(i + 1) * 10000;
+      const pseudoRand = sinVal - Math.floor(sinVal);
+      return {
+        label: new Date(d.ts).toLocaleDateString('en', { month: 'short', day: 'numeric' }),
+        value: d.value,
+        comparison: d.value * (0.85 + pseudoRand * 0.3),
+      };
+    });
+  }, [days]);
+
 
   const ChartComp = chartType === 'Line' ? LineChart : chartType === 'Bar' ? BarChart : AreaChart;
   const DataComp = chartType === 'Line' ? Line : chartType === 'Bar' ? Bar : Area;

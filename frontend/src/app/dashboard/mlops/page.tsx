@@ -453,6 +453,18 @@ export default function MLOpsPlatform() {
     }
   }, []);
 
+  /** Syncs the deployment configuration form inputs from an agent profile. */
+  const syncFormFromAgent = useCallback((agent: AgentProfile): void => {
+    setDepType(agent.deployment_type);
+    setActiveVerId(agent.active_version_id || "");
+    setCanaryVerId(agent.canary_version_id || "");
+    setCanarySplit(agent.canary_split);
+    setShadowVerId(agent.shadow_version_id || "");
+    setAbVerAId(agent.ab_version_a_id || "");
+    setAbVerBId(agent.ab_version_b_id || "");
+    setAbSplit(agent.ab_split);
+  }, []);
+
   /* ─────────────────────────────────────────────────────────────────────────
      Data Loading: Agent Details (versions, runs, telemetry, history)
      ───────────────────────────────────────────────────────────────────────── */
@@ -487,30 +499,22 @@ export default function MLOpsPlatform() {
     } finally {
       setDetailsLoading(false);
     }
-  }, []);
-
-  /** Syncs the deployment configuration form inputs from an agent profile. */
-  function syncFormFromAgent(agent: AgentProfile): void {
-    setDepType(agent.deployment_type);
-    setActiveVerId(agent.active_version_id || "");
-    setCanaryVerId(agent.canary_version_id || "");
-    setCanarySplit(agent.canary_split);
-    setShadowVerId(agent.shadow_version_id || "");
-    setAbVerAId(agent.ab_version_a_id || "");
-    setAbVerBId(agent.ab_version_b_id || "");
-    setAbSplit(agent.ab_split);
-  }
+  }, [syncFormFromAgent]);
 
   /* ── Effects ── */
 
   useEffect(() => {
-    loadPlatformData();
+    Promise.resolve().then(() => {
+      loadPlatformData();
+    });
   }, [loadPlatformData]);
 
   useEffect(() => {
     if (selectedAgent) {
       selectedAgentIdRef.current = selectedAgent.id;
-      loadAgentDetails(selectedAgent);
+      Promise.resolve().then(() => {
+        loadAgentDetails(selectedAgent);
+      });
     }
   }, [selectedAgent, loadAgentDetails]);
 

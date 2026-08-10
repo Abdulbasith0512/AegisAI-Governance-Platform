@@ -47,7 +47,7 @@ const PRESEEDED_SESSIONS: ChatSession[] = [
   }
 ];
 
-const mapBackendMessage = (msg: any): CopilotMessage => {
+const mapBackendMessage = (msg: { id: string; role: string; content: string; sources?: { citations?: string[] }; report_html?: string }): CopilotMessage => {
   let citations: string[] = [];
   if (msg.sources && msg.sources.citations) {
     citations = msg.sources.citations;
@@ -62,7 +62,7 @@ const mapBackendMessage = (msg: any): CopilotMessage => {
   };
 };
 
-const mapBackendSession = (sess: any): ChatSession => {
+const mapBackendSession = (sess: { id: string; title: string; messages?: { id: string; role: string; content: string; sources?: { citations?: string[] }; report_html?: string }[] }): ChatSession => {
   return {
     id: sess.id,
     title: sess.title,
@@ -117,7 +117,7 @@ export default function RegulatoryCopilot() {
 
     // 2. Attempt query endpoint
     let sessionUuid = activeSession.id;
-    let isMockSession = activeSession.id.startsWith("session-") || activeSession.id.startsWith("sess-");
+    const isMockSession = activeSession.id.startsWith("session-") || activeSession.id.startsWith("sess-");
 
     try {
       if (isMockSession) {

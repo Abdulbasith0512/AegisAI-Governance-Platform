@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -13,12 +13,17 @@ import ReactFlow, {
   NodeTypes,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { Save, Play, CheckCircle, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Save, Play, ArrowLeft } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { ToastBar } from "@/components/ui/ToastBar";
+import type { Toast } from "@/components/ui/ToastBar";
 
 // Custom Nodes styling
-const CustomNode = ({ data, type }: any) => {
+interface CustomNodeProps {
+  data: { label: string };
+  type: string;
+}
+const CustomNode = ({ data, type }: CustomNodeProps) => {
   const getColors = () => {
     switch (type) {
       case "start": return { bg: "#22c55e", border: "#16a34a" };
@@ -66,7 +71,8 @@ export default function WorkflowBuilder() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [toasts, setToasts] = useState<any[]>([]);
+
+const [toasts, setToasts] = useState<Toast[]>([]);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge(params, eds)), [setEdges]);

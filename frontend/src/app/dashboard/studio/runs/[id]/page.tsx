@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Play, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
 
@@ -9,7 +9,7 @@ export default function WorkflowExecution() {
   const params = useParams();
   const workflowId = params.id as string;
   const [isRunning, setIsRunning] = useState(false);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<unknown[]>([]);
 
   const handleExecute = () => {
     setIsRunning(true);
@@ -97,7 +97,7 @@ export default function WorkflowExecution() {
           <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 8 }}>
             {logs.length === 0 ? (
               <div style={{ color: "var(--text-3)", textAlign: "center", marginTop: 40, fontSize: 13 }}>
-                Click "Start Execution" to run the workflow.
+                Click &quot;Start Execution&quot; to run the workflow.
               </div>
             ) : (
               logs.map((log, i) => (

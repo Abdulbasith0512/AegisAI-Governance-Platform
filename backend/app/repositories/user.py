@@ -155,6 +155,7 @@ class UserRepository:
         """
         Creates a permission identifier.
         """
+        permission = Permission(name=name, description=description)
         self.db.add(permission)
         await self.db.commit()
         await self.db.refresh(permission)

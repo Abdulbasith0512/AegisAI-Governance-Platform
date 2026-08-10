@@ -1,19 +1,61 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Play, Activity, Clock, ServerCrash, CheckCircle, XCircle } from "lucide-react";
 import { ToastBar } from "@/components/ui/ToastBar";
+
+/** Shape returned by the simulation run API. */
+interface SimulationScenario {
+  name: string;
+  target_tps: number;
+  num_transactions: number;
+}
+
+interface SimulationRun {
+  id: string;
+  status: string;
+  scenario?: SimulationScenario;
+  scenario_id?: string;
+}
+
+interface SimulationMetric {
+  metric_type: string;
+  value: number;
+}
+
+interface SimulationEvent {
+  event_type: string;
+  severity: string;
+  message: string;
+  timestamp: string;
+}
+
+interface Toast {
+  id: string;
+  type: string;
+  message: string;
+}
+
+interface MetricCardProps {
+  icon: React.ReactElement;
+  label: string;
+  value: string;
+  unit: string;
+  color: string;
+}
 
 export default function LiveSimulation() {
   const router = useRouter();
   const params = useParams();
   const runId = params.id as string;
   
-  const [run, setRun] = useState<any>(null);
-  const [metrics, setMetrics] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
-  const [toasts, setToasts] = useState<any[]>([]);
+  const [run, setRun] = useState<SimulationRun | null>(null);
+  const [metrics, setMetrics] = useState<SimulationMetric[]>([]);
+  const [events, setEvents] = useState<SimulationEvent[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const cpuLoad = useMemo(() => (Math.random() * 40 + 20).toFixed(1), []);
 
   // Fetch initial run state
   useEffect(() => {
@@ -87,7 +129,7 @@ export default function LiveSimulation() {
         setEvents(prev => [{ event_type: "batch_processed", severity: "info", message: `Processed batch ${tick}`, timestamp: new Date().toISOString() }, ...prev]);
       }
       if (tick > 15) {
-        setRun((prev: any) => ({ ...prev, status: "completed" }));
+        setRun((prev: SimulationRun | null) => prev ? { ...prev, status: "completed" } : prev);
         clearInterval(interval);
         setTimeout(() => router.push(`/dashboard/simulation/analytics`), 2000);
       }
@@ -145,7 +187,7 @@ export default function LiveSimulation() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <MetricCard icon={<Activity />} label="Live Throughput (TPS)" value={getLatestMetric("throughput")} unit="tx/s" color="var(--success)" />
           <MetricCard icon={<Clock />} label="System Latency" value={getLatestMetric("latency")} unit="ms" color="var(--accent-1)" />
-          <MetricCard icon={<ServerCrash />} label="CPU Simulation Load" value={(Math.random() * 40 + 20).toFixed(1)} unit="%" color="var(--warning)" />
+          <MetricCard icon={<ServerCrash />} label="CPU Simulation Load" value={cpuLoad} unit="%" color="var(--warning)" />
         </div>
 
         {/* Live Timeline & Logs */}
@@ -182,7 +224,7 @@ export default function LiveSimulation() {
   );
 }
 
-function MetricCard({ icon, label, value, unit, color }: any) {
+function MetricCard({ icon, label, value, unit, color }: MetricCardProps) {
   return (
     <div style={{ background: "var(--surface-2)", border: "1px solid var(--border-1)", borderRadius: "12px", padding: 20 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-2)", marginBottom: 12 }}>
