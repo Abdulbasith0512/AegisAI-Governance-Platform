@@ -4,12 +4,18 @@ import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Play, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
 
+interface ExecutionStep {
+  msg: string;
+  status: string;
+  time: number;
+}
+
 export default function WorkflowExecution() {
   const router = useRouter();
   const params = useParams();
   const workflowId = params.id as string;
   const [isRunning, setIsRunning] = useState(false);
-  const [logs, setLogs] = useState<unknown[]>([]);
+  const [logs, setLogs] = useState<ExecutionStep[]>([]);
 
   const handleExecute = () => {
     setIsRunning(true);

@@ -171,7 +171,7 @@ export default function ScenarioBuilder() {
   );
 }
 
-function Section({ title, icon, children }: { title: string; icon: React.ReactElement; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon: React.ReactElement<{ size?: number; color?: string }>; children: React.ReactNode }) {
   return (
     <div style={{ background: "var(--surface-2)", border: "1px solid var(--border-1)", borderRadius: "12px", padding: 24 }}>
       <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-1)", display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>

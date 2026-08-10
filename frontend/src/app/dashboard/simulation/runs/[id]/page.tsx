@@ -38,7 +38,7 @@ interface Toast {
 }
 
 interface MetricCardProps {
-  icon: React.ReactElement;
+  icon: React.ReactElement<{ size?: number; color?: string }>;
   label: string;
   value: string;
   unit: string;
