@@ -2,7 +2,6 @@
 
 Thank you for contributing to AegisAI. As an AI Governance Operating System for banking environments, security, robustness, correctness, and transparency are paramount.
 
----
 
 ## Code Quality Standards
 
