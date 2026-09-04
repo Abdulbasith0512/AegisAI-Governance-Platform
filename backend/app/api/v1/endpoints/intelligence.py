@@ -106,15 +106,10 @@ async def run_benchmark(
     """
     repo = IntelligenceRepository(db)
     run = await repo.create_benchmark_run(parameters=payload.parameters or {})
-    
-    # Simulate completion
-    metrics = {
-        "models_evaluated": ["FraudRFClassifier_v1", "FraudGBCClassifier_v2", "AmlNetworkGraph_v1"],
-        "latency_median_ms": 15.4,
-        "throughput_avg_tps": 450.0
-    }
-    await repo.update_benchmark_run(run.id, "completed", metrics=metrics)
-    
+
+    # The run is recorded with its initial status. Metrics are written by
+    # the real benchmark worker on completion — this endpoint never
+    # fabricates latency/throughput numbers.
     refreshed = await repo.get_benchmark_run(run.id)
     return BenchmarkRunOut.model_validate(refreshed)
 

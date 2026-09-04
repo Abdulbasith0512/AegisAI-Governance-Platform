@@ -20,6 +20,19 @@ class TransactionRepository:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
+    async def get_customer_and_account(self, customer_id: uuid.UUID) -> Optional[Account]:
+        """Strict lookup: returns the account only if customer + account exist.
+
+        Unlike get_or_create_customer_and_account, this never fabricates
+        Mock Customer rows. The intercept endpoint uses it so unknown
+        customer_ids fail with 404 instead of polluting production data.
+        """
+        cust_res = await self.db.execute(select(Customer).where(Customer.id == customer_id))
+        if not cust_res.scalars().first():
+            return None
+        acc_res = await self.db.execute(select(Account).where(Account.customer_id == customer_id))
+        return acc_res.scalars().first()
+
     async def get_or_create_customer_and_account(self, customer_id: uuid.UUID) -> Account:
         """
         Retrieves a customer account, creating a mock profile if missing to prevent FK violations.

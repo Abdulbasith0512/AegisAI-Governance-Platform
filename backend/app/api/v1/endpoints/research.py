@@ -1,4 +1,3 @@
-import uuid
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,16 +62,10 @@ async def create_experiment_run(
         experiment_id=payload.experiment_id,
         parameters=payload.parameters or {}
     )
-    
-    # Simulate completion immediately in background/mock environment
-    metrics = {
-        "accuracy": 0.94 + (uuid.uuid4().int % 20) / 1000.0,
-        "latency_ms": 12.0 + (uuid.uuid4().int % 10),
-        "policy_violations_count": 0,
-        "drift_detected": False
-    }
-    
-    await repo.update_run_status(run.id, "completed", metrics=metrics, completed=True)
+
+    # The run is recorded with its initial status. Metrics are written by
+    # the real evaluation worker on completion — this endpoint never
+    # fabricates accuracy/latency numbers.
     refreshed = await repo.get_run(run.id)
     return ExperimentRunOut.model_validate(refreshed)
 

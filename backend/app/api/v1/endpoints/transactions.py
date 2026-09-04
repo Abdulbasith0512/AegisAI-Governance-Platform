@@ -2,7 +2,7 @@ import uuid
 import time
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, require_permission
@@ -43,8 +43,14 @@ async def intercept_transaction(
     tx_id = payload.transaction_id or uuid.uuid4()
     logger.info("Intercept attempt tx_id=%s customer=%s amount=%s %s", tx_id, payload.customer_id, payload.amount, payload.currency)
 
-    # 1. Resolve customer profile and account dependencies
-    account = await tx_repo.get_or_create_customer_and_account(payload.customer_id)
+    # 1. Resolve customer profile and account dependencies.
+    # Strict lookup: unknown customers fail with 404. The repository no
+    # longer auto-creates Mock Customer rows on this path, so production
+    # data is never polluted by typos or forged IDs.
+    account = await tx_repo.get_customer_and_account(payload.customer_id)
+    if account is None:
+        logger.warning("Intercept rejected tx_id=%s: unknown customer %s", tx_id, payload.customer_id)
+        raise HTTPException(status_code=404, detail="Customer or account not found.")
     merchant_id = await tx_repo.get_or_create_merchant(payload.merchant_id, payload.merchant_category)
     # Flat device_id / ip_address aliases fold into device telemetry when
     # no full device object is supplied.
@@ -124,9 +130,16 @@ async def intercept_transaction(
     elif verdict == "under_review":
         reasons.append("Medium trust score metrics require human-in-the-loop audit.")
 
-    trust_score = execution_results.get("trust_score_value", 100)
+    # Trust must come from the pipeline. A missing score means the
+    # governance graph violated its contract — fail loudly (500) rather
+    # than returning a fabricated 100.
     if "trust_score_value" not in execution_results:
-        logger.warning("Pipeline returned no trust_score_value tx_id=%s; defaulting to 100", tx_id)
+        logger.error("Pipeline returned no trust_score_value tx_id=%s", tx_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Governance pipeline returned no trust score."
+        )
+    trust_score = execution_results["trust_score_value"]
     explanation_res = execution_results.get("explanation_data", {}) or {}
     if not isinstance(explanation_res, dict):
         explanation_res = {"human_readable": getattr(explanation_res, "human_readable", "Checks completed successfully.")}
@@ -216,56 +229,24 @@ async def intercept_transaction(
 @router.get("/history", response_model=List[TransactionOut])
 async def get_transactions_history(
     limit: int = 50,
-    db: Optional[AsyncSession] = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("read:transactions"))
 ) -> List[TransactionOut]:
-    """Retrieves list of recently ingested transactions."""
-    now = datetime.utcnow()
-    mock_records = [
-        TransactionOut(
-            id=uuid.uuid4(),
-            account_id=uuid.uuid4(),
-            merchant_id=uuid.uuid4(),
-            amount=250.00,
-            currency="USD",
-            transaction_type="wire",
-            status="approved",
-            reference_number="TX-9A8B7C6D5E",
-            initiated_at=now
-        ),
-        TransactionOut(
-            id=uuid.uuid4(),
-            account_id=uuid.uuid4(),
-            merchant_id=uuid.uuid4(),
-            amount=12500.00,
-            currency="USD",
-            transaction_type="crypto_transfer",
-            status="under_review",
-            reference_number="TX-1F2E3D4C5B",
-            initiated_at=now
-        ),
-        TransactionOut(
-            id=uuid.uuid4(),
-            account_id=uuid.uuid4(),
-            merchant_id=uuid.uuid4(),
-            amount=50000.00,
-            currency="USD",
-            transaction_type="wire",
-            status="declined",
-            reference_number="TX-7K8L9M0N1P",
-            initiated_at=now
-        )
-    ]
+    """Retrieves list of recently ingested transactions.
 
-    if db is None:
-        return mock_records
-
+    Returns an empty list when no transactions exist. Database failures
+    surface as 503 — this endpoint never returns fabricated rows.
+    """
+    tx_repo = TransactionRepository(db)
     try:
-        tx_repo = TransactionRepository(db)
         records = await tx_repo.list_transactions(limit=limit)
-        return [TransactionOut.model_validate(r) for r in records] if records else mock_records
     except Exception:
-        return mock_records
+        logger.exception("Transaction history query failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Transaction store unavailable."
+        )
+    return [TransactionOut.model_validate(r) for r in records]
 
 @router.get("/explanation/{tx_id}")
 async def get_transaction_explanation(
@@ -429,14 +410,17 @@ async def reprocess_transaction(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("write:transactions"))
 ) -> Dict[str, Any]:
-    """
-    Reprocesses an under_review transaction using updated governance configurations.
+    """Reprocesses an under_review transaction through the live pipeline.
+
+    Reconstructs the request from the stored row and re-runs
+    intercept_transaction, so the new verdict comes from real agent
+    evaluation — never a hard-coded status flip.
     """
     tx_id_str = payload.get("transaction_id")
     if not tx_id_str:
         raise HTTPException(status_code=400, detail="Missing transaction_id.")
     tx_id = uuid.UUID(tx_id_str)
-    
+
     tx_repo = TransactionRepository(db)
     tx = await tx_repo.get_transaction_by_id(tx_id)
     if not tx:
@@ -445,14 +429,30 @@ async def reprocess_transaction(
     if tx.status != "under_review":
         raise HTTPException(status_code=400, detail="Only transactions in 'under_review' state can be reprocessed.")
 
-    # Simulates updated checks
-    tx.status = "approved"
-    tx.completed_at = datetime.utcnow()
-    await db.commit()
+    cust_id = tx.account.customer_id if tx.account else uuid.uuid4()
+    req_payload = TransactionInterceptRequest(
+        transaction_id=uuid.uuid4(),  # new run ID; original row is preserved
+        customer_id=cust_id,
+        merchant_id=tx.merchant_id,
+        amount=float(tx.amount),
+        currency=tx.currency,
+        channel="mobile",
+        transaction_type=tx.transaction_type,
+        device={
+            "fingerprint": tx.device.fingerprint if tx.device else f"reprocess-{tx_id.hex[:8]}",
+            "ip_address": tx.device.ip_address if tx.device else "127.0.0.1",
+            "is_emulator": tx.device.is_emulator if tx.device else False
+        }
+    )
+
+    res = await intercept_transaction(req_payload, db, current_user)
+    logger.info("Reprocessed tx %s -> new run %s verdict=%s", tx_id, res.transaction_id, res.verdict)
 
     return {
-        "transaction_id": tx_id,
+        "transaction_id": res.transaction_id,
+        "original_transaction_id": tx_id,
         "status": "success",
-        "new_verdict": "approved",
-        "message": "Transaction reprocessed and approved successfully."
+        "new_verdict": res.verdict,
+        "new_trust_score": res.trust_score,
+        "message": "Transaction reprocessed through the governance pipeline.",
     }
