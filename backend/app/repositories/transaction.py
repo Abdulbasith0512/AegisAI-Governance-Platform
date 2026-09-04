@@ -9,6 +9,7 @@ from app.models.transactions import Transaction, Device
 from app.models.governance import TrustScore, PolicyCheck, Explanation, ConsensusVote, HumanReview
 from app.models.agents import Prediction, AIAgent, ModelVersion
 from app.models.banking import Account, Customer, Beneficiary, Merchant, Branch
+from agents.supervisor import parse_supervisor_verdict
 
 logger = logging.getLogger("aegisai.repositories.transaction")
 
@@ -167,7 +168,8 @@ class TransactionRepository:
         status: str,
         merchant_id: Optional[uuid.UUID] = None,
         device_id: Optional[uuid.UUID] = None,
-        beneficiary_id: Optional[uuid.UUID] = None
+        beneficiary_id: Optional[uuid.UUID] = None,
+        reference_number: Optional[str] = None
     ) -> Transaction:
         tx = Transaction(
             id=transaction_id,
@@ -179,7 +181,7 @@ class TransactionRepository:
             merchant_id=merchant_id,
             device_id=device_id,
             beneficiary_id=beneficiary_id,
-            reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}"
+            reference_number=reference_number or f"TX-{uuid.uuid4().hex[:12].upper()}"
         )
         self.db.add(tx)
         await self.db.commit()
@@ -205,8 +207,11 @@ class TransactionRepository:
         return result.scalars().first()
 
     async def list_transactions(self, limit: int = 50) -> List[Transaction]:
+        # Eager-load account so async callers (e.g. intercept AML context)
+        # can read tx.account.customer_id without lazy-load failures.
         result = await self.db.execute(
             select(Transaction)
+            .options(joinedload(Transaction.account))
             .order_by(desc(Transaction.initiated_at))
             .limit(limit)
         )
@@ -311,15 +316,10 @@ class TransactionRepository:
             )
             self.db.add(exp)
 
-        # 6. Save Human Review if under review
-        supervisor_verdict = "approved"
-        supervisor_res = state.get("supervisor_result")
-        if supervisor_res:
-            reasoning = str(self._res_get(supervisor_res, "reasoning", "") or "").lower()
-            if "under_review" in reasoning:
-                supervisor_verdict = "under_review"
-            elif "declined" in reasoning:
-                supervisor_verdict = "declined"
+        # 6. Save Human Review if under review.
+        # Parse the structured supervisor verdict prefix (same helper as
+        # the intercept endpoint) instead of substring-matching prose.
+        supervisor_verdict = parse_supervisor_verdict(state.get("supervisor_result"))
 
         if supervisor_verdict == "under_review":
             hr = HumanReview(

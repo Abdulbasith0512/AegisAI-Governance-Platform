@@ -19,6 +19,7 @@ from app.repositories.review import ReviewRepository
 from app.services.vector_store import aegis_vector_store
 from app.services.observability import record_transaction_metrics
 from agents.graph import compiled_graph
+from agents.supervisor import parse_supervisor_verdict
 
 router = APIRouter(prefix="/transactions", tags=["Transactions Registry"])
 
@@ -65,7 +66,9 @@ async def intercept_transaction(
         "prediction_id": uuid.uuid4()
     }
 
-    # Pull prior transactions to pass graph AML cycle evaluation context
+    # Pull prior transactions to pass graph AML cycle evaluation context.
+    # list_transactions eager-loads account so tx.account is populated
+    # (async lazy-loading would otherwise resolve to None here).
     history = await tx_repo.list_transactions(limit=10)
     state["history"] = [
         {"customer_id": str(tx.account.customer_id) if tx.account else "", "beneficiary_id": str(tx.beneficiary_id) if tx.beneficiary_id else "", "amount": float(tx.amount)}
@@ -81,19 +84,16 @@ async def intercept_transaction(
             detail=f"Governance pipeline runtime crash: {str(e)}"
         )
 
-    # 4. Resolve final verdict and trust score parameters
+    # 4. Resolve final verdict and trust score parameters.
+    # The supervisor emits a structured "verdict: X | ..." reasoning prefix;
+    # parse it instead of substring-matching free prose.
     supervisor_res = execution_results.get("supervisor_result")
-    verdict = "approved"
+    verdict = parse_supervisor_verdict(supervisor_res)
     reasons = []
-    if supervisor_res:
-        reasoning = supervisor_res.get("reasoning") if isinstance(supervisor_res, dict) else getattr(supervisor_res, "reasoning", "")
-        reasoning = str(reasoning or "").lower()
-        if "declined" in reasoning:
-            verdict = "declined"
-            reasons.append("Failed safety policies or extreme fraud metrics detected.")
-        elif "under_review" in reasoning:
-            verdict = "under_review"
-            reasons.append("Medium trust score metrics require human-in-the-loop audit.")
+    if verdict == "declined":
+        reasons.append("Failed safety policies or extreme fraud metrics detected.")
+    elif verdict == "under_review":
+        reasons.append("Medium trust score metrics require human-in-the-loop audit.")
 
     trust_score = execution_results.get("trust_score_value", 100)
     explanation_res = execution_results.get("explanation_data", {}) or {}
@@ -101,7 +101,9 @@ async def intercept_transaction(
         explanation_res = {"human_readable": getattr(explanation_res, "human_readable", "Checks completed successfully.")}
     human_explanation = explanation_res.get("human_readable", "Checks completed successfully.")
 
-    # 5. Persist Transaction record & multi-agent outcomes
+    # 5. Persist Transaction record & multi-agent outcomes.
+    # Reuse the state's reference number so the persisted row matches
+    # the identifier returned by the pipeline (single source of truth).
     tx_record = await tx_repo.create_transaction(
         transaction_id=tx_id,
         account_id=account.id,
@@ -111,7 +113,8 @@ async def intercept_transaction(
         status=verdict,
         merchant_id=merchant_id,
         device_id=device_id,
-        beneficiary_id=beneficiary_id
+        beneficiary_id=beneficiary_id,
+        reference_number=state["transaction"]["reference_number"]
     )
 
     await tx_repo.persist_pipeline_results(tx_id, execution_results, execution_results)

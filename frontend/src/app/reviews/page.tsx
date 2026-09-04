@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { apiUrl } from "@/lib/api";
 
 export interface TimelineStep {
   event: string;
@@ -34,122 +35,116 @@ export interface ReviewCase {
   comments?: string;
 }
 
-// Pre-seeded cases history to display when backend isn't actively running
-const SIMULATED_QUEUE: ReviewCase[] = [
-  {
-    id: "rev-101",
-    transaction_id: "tx-99801",
-    amount: 4800.00,
-    currency: "USD",
-    customer_name: "Aarav Sharma",
-    trust_score: 68.0,
-    status: "pending",
-    reviewer_name: null,
-    assigned_at: "Jul 15, 12:00",
-    sla_deadline: "Jul 15, 16:00",
-    is_sla_breached: true,
-    warnings: ["AML Structuring Alert: amount between 4500 and 5000", "Device Emulator detected"],
-    explanation: "Transaction flagged due to suspected transaction smurfing (structuring bounds) combined with non-standard device fingerprint parameters.",
-    timeline: [
-      { event: "Transaction Ingestion", duration: "1.2ms", status: "success" },
-      { event: "Device Fingerprinting Analysis", duration: "24.5ms", status: "warning" },
-      { event: "AML smurfing boundary checks", duration: "15.0ms", status: "failed" }
-    ],
-    policies: [
-      { rule_id: "POL-RBI-101", name: "Foreign outward limit", status: "pass" },
-      { rule_id: "POL-AML-202", name: "Structuring limit rule", status: "fail" }
-    ],
-    shap: { "amount_value": 0.75, "device_is_emulator": 0.60, "velocity": 0.12 }
-  },
-  {
-    id: "rev-102",
-    transaction_id: "tx-99802",
-    amount: 12500.00,
-    currency: "EUR",
-    customer_name: "Priya Patel",
-    trust_score: 72.0,
-    status: "escalated",
-    reviewer_name: "Auditor John",
-    assigned_at: "Jul 15, 14:10",
-    sla_deadline: "Jul 15, 18:10",
-    is_sla_breached: false,
-    warnings: ["Foreign Currency Limit exceeded", "Trust score below baseline"],
-    explanation: "Transaction holds high amount in foreign currency violating Liberal Remittance scheme rules baseline limits.",
-    timeline: [
-      { event: "Transaction Ingestion", duration: "1.0ms", status: "success" },
-      { event: "RBI Outward limits checked", duration: "18.2ms", status: "failed" }
-    ],
-    policies: [
-      { rule_id: "POL-RBI-101", name: "Foreign outward limit", status: "fail" },
-      { rule_id: "POL-AML-202", name: "Structuring limit rule", status: "pass" }
-    ],
-    shap: { "currency_match": 0.85, "amount_value": 0.45 }
-  }
-];
-
-const SIMULATED_HISTORY: ReviewCase[] = [
-  {
-    id: "rev-201",
-    transaction_id: "tx-99701",
-    amount: 3200.00,
-    currency: "USD",
-    customer_name: "Kabir Singh",
-    trust_score: 95.0,
-    status: "approved",
-    reviewer_name: "Auditor John",
-    assigned_at: "Jul 14, 10:00",
-    sla_deadline: "Jul 14, 14:00",
-    is_sla_breached: false,
-    comments: "Auditor approved: Legit business transfer verified."
-  }
-];
-
 export default function HumanReviewCenter() {
-  const [queue, setQueue] = useState<ReviewCase[]>(SIMULATED_QUEUE);
-  const [history, setHistory] = useState<ReviewCase[]>(SIMULATED_HISTORY);
+  const [queue, setQueue] = useState<ReviewCase[]>([]);
+  const [history, setHistory] = useState<ReviewCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<"queue" | "history">("queue");
   const [selectedCase, setSelectedCase] = useState<ReviewCase | null>(null);
 
   // Auditor verdict comments input
   const [verdictComments, setVerdictComments] = useState("");
+  const [acting, setActing] = useState(false);
 
-  const handleAction = (status: "approved" | "rejected" | "escalated") => {
+  const fmtDT = (v: string) => {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? v : d.toLocaleString();
+  };
+
+  const loadLists = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [qRes, hRes] = await Promise.all([
+        fetch(apiUrl("/api/v1/reviews/queue")),
+        fetch(apiUrl("/api/v1/reviews/history")),
+      ]);
+      if (!qRes.ok) throw new Error(`Queue request failed (${qRes.status})`);
+      if (!hRes.ok) throw new Error(`History request failed (${hRes.status})`);
+      setQueue(await qRes.json());
+      setHistory(await hRes.json());
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load review data");
+      setQueue([]);
+      setHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    async function initial() { await loadLists(); }
+    void initial();
+  }, [loadLists]);
+
+  const selectCase = useCallback(async (c: ReviewCase) => {
+    setSelectedCase(c);
+    setVerdictComments("");
+    // Enrich with live evidence (warnings, explanation, timeline, policies, SHAP)
+    try {
+      const res = await fetch(apiUrl(`/api/v1/reviews/${c.id}`));
+      if (!res.ok) return;
+      const d = await res.json();
+      setSelectedCase((prev) => {
+        if (!prev || prev.id !== c.id) return prev;
+        return {
+          ...prev,
+          comments: d.comments ?? prev.comments,
+          warnings: d.trust_warnings ?? prev.warnings,
+          explanation: d.explanation_human ?? prev.explanation,
+          timeline: Array.isArray(d.explanation_timeline)
+            ? d.explanation_timeline.map((t: { event?: string; duration_ms?: number; status?: string }) => ({
+                event: String(t.event ?? "step"),
+                duration: typeof t.duration_ms === "number" ? `${t.duration_ms}ms` : "—",
+                status: String(t.status ?? "success"),
+              }))
+            : prev.timeline,
+          policies: Array.isArray(d.policy_checks)
+            ? d.policy_checks.map((p: { rule_id: string; status: string }) => ({
+                rule_id: p.rule_id,
+                name: p.rule_id,
+                status: p.status,
+              }))
+            : prev.policies,
+          shap: d.explanation_shap ?? prev.shap,
+        };
+      });
+    } catch {
+      // Keep list-level summary if detail fetch fails
+    }
+  }, []);
+
+  const handleAction = async (status: "approved" | "rejected" | "escalated") => {
     if (!selectedCase) return;
-    if (verdictComments.length < 10) {
+    if (verdictComments.trim().length < 10) {
       alert("Please write at least 10 characters in reviewer comments.");
       return;
     }
 
-    // Process case resolution simulation
-    if (status === "approved" || status === "rejected") {
-      // Remove from active queue
-      setQueue(queue.filter(q => q.id !== selectedCase.id));
-
-      // Add to history
-      const newHistoryItem = {
-        id: selectedCase.id,
-        transaction_id: selectedCase.transaction_id,
-        amount: selectedCase.amount,
-        currency: selectedCase.currency,
-        customer_name: selectedCase.customer_name,
-        trust_score: selectedCase.trust_score,
-        status: status,
-        reviewer_name: "Auditor Admin",
-        assigned_at: selectedCase.assigned_at,
-        sla_deadline: selectedCase.sla_deadline,
-        is_sla_breached: selectedCase.is_sla_breached,
-        comments: verdictComments
-      };
-      setHistory([newHistoryItem, ...history]);
-    } else {
-      // Escalated updates queue state
-      setQueue(queue.map(q => q.id === selectedCase.id ? { ...q, status: "escalated", reviewer_name: "Auditor Admin" } : q));
+    setActing(true);
+    try {
+      const res = await fetch(apiUrl(`/api/v1/reviews/${selectedCase.id}/action`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, comments: verdictComments.trim() }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const msg = body?.detail
+          ? (typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail))
+          : `Action failed (${res.status})`;
+        alert(msg);
+        return;
+      }
+      alert(`Auditor verdict '${status.toUpperCase()}' resolved and audited successfully.`);
+      setSelectedCase(null);
+      setVerdictComments("");
+      await loadLists();
+    } finally {
+      setActing(false);
     }
-
-    alert(`Auditor verdict '${status.toUpperCase()}' resolved and audited successfully.`);
-    setSelectedCase(null);
-    setVerdictComments("");
   };
 
   return (
@@ -196,6 +191,17 @@ export default function HumanReviewCenter() {
       </header>
 
       {/* Grid Workspace */}
+      {loadError && (
+        <div className="mb-6 p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300 flex items-center justify-between gap-4">
+          <span>Could not reach the review API: {loadError}</span>
+          <button
+            onClick={() => void loadLists()}
+            className="px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-8">
 
         {/* Left Column: Case Queue Lists */}
@@ -209,7 +215,7 @@ export default function HumanReviewCenter() {
               queue.map((q) => (
                 <div
                   key={q.id}
-                  onClick={() => setSelectedCase(q)}
+                  onClick={() => void selectCase(q)}
                   className={`p-6 rounded-xl border transition-all duration-300 cursor-pointer ${selectedCase?.id === q.id
                       ? "bg-[#121620]/80 border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.1)]"
                       : "bg-[#121620]/40 border-slate-800 hover:border-slate-700"
@@ -247,7 +253,7 @@ export default function HumanReviewCenter() {
                     <span className="text-slate-400">
                       Trust score: <strong className={q.trust_score < 70 ? "text-rose-400" : "text-amber-400"}>{q.trust_score}</strong>
                     </span>
-                    <span className="text-slate-500">Deadline: {q.sla_deadline}</span>
+                    <span className="text-slate-500">Deadline: {fmtDT(q.sla_deadline)}</span>
                   </div>
                 </div>
               ))
@@ -272,7 +278,11 @@ export default function HumanReviewCenter() {
               ))
             )}
 
-            {((activeTab === "queue" && queue.length === 0) || (activeTab === "history" && history.length === 0)) && (
+            {loading ? (
+              <div className="text-center py-20 border border-slate-800/50 rounded-xl bg-[#121620]/10 text-slate-500 text-sm">
+                Loading live review queue…
+              </div>
+            ) : ((activeTab === "queue" && queue.length === 0) || (activeTab === "history" && history.length === 0)) && (
               <div className="text-center py-20 border border-slate-800/50 rounded-xl bg-[#121620]/10 text-slate-500">
                 No case logs recorded in this section.
               </div>
@@ -307,7 +317,7 @@ export default function HumanReviewCenter() {
                 <div>
                   <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block mb-2">Decision Narrative</span>
                   <div className="p-3.5 rounded bg-indigo-500/5 border border-indigo-500/15 text-indigo-300 text-xs leading-relaxed">
-                    {selectedCase.explanation}
+                    {selectedCase.explanation ?? "Loading decision narrative…"}
                   </div>
                 </div>
 
@@ -383,20 +393,23 @@ export default function HumanReviewCenter() {
 
                   <div className="grid grid-cols-3 gap-2">
                     <button
-                      onClick={() => handleAction("approved")}
-                      className="py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-[10px] font-extrabold uppercase font-mono text-white shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                      onClick={() => void handleAction("approved")}
+                      disabled={acting}
+                      className="py-2 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-[10px] font-extrabold uppercase font-mono text-white shadow-[0_0_15px_rgba(16,185,129,0.15)]"
                     >
                       Approve
                     </button>
                     <button
-                      onClick={() => handleAction("rejected")}
-                      className="py-2 rounded bg-rose-600 hover:bg-rose-500 text-[10px] font-extrabold uppercase font-mono text-white shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                      onClick={() => void handleAction("rejected")}
+                      disabled={acting}
+                      className="py-2 rounded bg-rose-600 hover:bg-rose-500 disabled:opacity-60 text-[10px] font-extrabold uppercase font-mono text-white shadow-[0_0_15px_rgba(244,63,94,0.15)]"
                     >
                       Reject
                     </button>
                     <button
-                      onClick={() => handleAction("escalated")}
-                      className="py-2 rounded bg-amber-600 hover:bg-amber-500 text-[10px] font-extrabold uppercase font-mono text-white shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                      onClick={() => void handleAction("escalated")}
+                      disabled={acting}
+                      className="py-2 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-[10px] font-extrabold uppercase font-mono text-white shadow-[0_0_15px_rgba(245,158,11,0.15)]"
                     >
                       Escalate
                     </button>

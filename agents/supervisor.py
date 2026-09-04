@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from typing import Any, Dict, List
 from agents.base import BaseGovernanceAgent, AgentResponse
@@ -6,6 +7,36 @@ from app.services.trust_engine import WeightedTrustEngine
 from app.schemas.trust import TrustCalculationRequest
 
 logger = logging.getLogger("aegisai.agents.SupervisorAgent")
+
+SUPERVISOR_VERDICTS = ("approved", "declined", "under_review")
+
+_verdict_prefix_re = re.compile(r"verdict\s*:\s*(approved|declined|under_review)", re.IGNORECASE)
+
+
+def parse_supervisor_verdict(supervisor_result: Any) -> str:
+    """Extract the structured verdict from a supervisor result.
+
+    The supervisor emits ``verdict: <verdict> | trust_score: ...`` as the
+    reasoning prefix. Parse that prefix instead of substring-matching the
+    whole reasoning text (explanation prose may contain words like
+    "declined"). Falls back to legacy substring matching, then "approved".
+    """
+    if supervisor_result is None:
+        return "approved"
+    if isinstance(supervisor_result, dict):
+        reasoning = supervisor_result.get("reasoning", "")
+    else:
+        reasoning = getattr(supervisor_result, "reasoning", "")
+    text = str(reasoning or "")
+    m = _verdict_prefix_re.search(text)
+    if m:
+        return m.group(1).lower()
+    lowered = text.lower()
+    if "under_review" in lowered:
+        return "under_review"
+    if "declined" in lowered:
+        return "declined"
+    return "approved"
 
 class SupervisorAgent(BaseGovernanceAgent):
     """
