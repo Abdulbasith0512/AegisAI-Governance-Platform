@@ -29,11 +29,14 @@ class DeviceAgent(BaseGovernanceAgent):
         t_start = time.perf_counter()
         
         risk_score = 0.0
+        flags: List[str] = []
         if is_emulator:
             risk_score += 0.55
+            flags.append("emulator_detected")
             logs.append("Warning: Terminal is running on an emulator.")
         if not ip:
             risk_score += 0.40
+            flags.append("missing_ip")
             logs.append("Warning: Ingested transaction lacks IP tracking.")
             
         confidence = float(1.0 - risk_score)
@@ -43,13 +46,25 @@ class DeviceAgent(BaseGovernanceAgent):
         
         state["device_prob"] = risk_score
 
+        # Deterministic heuristic (no ML model). Labeled as placeholder so
+        # downstream consumers never mistake it for a model prediction.
+        envelope = {
+            "risk_score": risk_score,
+            "flags": flags,
+            "evidence": {"fingerprint": fingerprint, "is_emulator": bool(is_emulator), "ip_present": bool(ip)},
+            "model": "heuristic-v1",
+            "placeholder": True,
+        }
+
         if risk_score > 0.50:
             return {
                 "confidence_score": confidence,
-                "reasoning": f"High risk: suspicious emulator execution footprint (device risk: {risk_score:.2f})."
+                "reasoning": f"High risk: suspicious emulator execution footprint (device risk: {risk_score:.2f}).",
+                **envelope,
             }
 
         return {
             "confidence_score": confidence,
-            "reasoning": "Low risk: device integrity check passed."
+            "reasoning": "Low risk: device integrity check passed.",
+            **envelope,
         }

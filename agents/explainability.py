@@ -65,7 +65,14 @@ class ExplainabilityAgent(BaseGovernanceAgent):
         # Save output structures back to the state for repositories mapping
         state["explanation_data"] = res
 
+        # Attribution map and timeline durations are deterministic
+        # placeholders (not SHAP model output). Labeled so consumers know.
         return {
             "confidence_score": 1.00,
-            "reasoning": f"Explanation: {res['human_readable']}"
+            "reasoning": f"Explanation: {res['human_readable']}",
+            "risk_score": 0.00,
+            "flags": [],
+            "evidence": {"warnings": warnings, "feature_importance": agent_traces["feature_importance"]},
+            "model": "attribution-placeholder-v1",
+            "placeholder": True,
         }

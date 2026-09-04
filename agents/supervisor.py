@@ -10,6 +10,18 @@ logger = logging.getLogger("aegisai.agents.SupervisorAgent")
 
 SUPERVISOR_VERDICTS = ("approved", "declined", "under_review")
 
+# Agents the supervisor requires before aggregating. Determined here —
+# not scattered across the graph — so a missing result is an explicit,
+# logged failure instead of a silent default.
+REQUIRED_AGENTS = (
+    "device_result",
+    "kyc_result",
+    "fraud_result",
+    "aml_result",
+    "policy_result",
+    "explainability_result",
+)
+
 _verdict_prefix_re = re.compile(r"verdict\s*:\s*(approved|declined|under_review)", re.IGNORECASE)
 
 
@@ -49,20 +61,37 @@ class SupervisorAgent(BaseGovernanceAgent):
     async def _execute(self, state: Dict[str, Any], logs: List[str]) -> Dict[str, Any]:
         logs.append("Evaluating multi-agent outcomes to determine transaction governance verdict.")
         
-        # 1. Fetch outputs from preceding nodes
-        device_result: AgentResponse = state.get("device_result")
-        kyc_result: AgentResponse = state.get("kyc_result")
-        fraud_result: AgentResponse = state.get("fraud_result")
-        aml_result: AgentResponse = state.get("aml_result")
-        policy_result: AgentResponse = state.get("policy_result")
-        explain_result: AgentResponse = state.get("explainability_result")
+        # 1. Fetch outputs from preceding nodes.
+        # Fail-closed: a missing or failed agent contributes 0.0 confidence
+        # (full risk) instead of silently approving. Failures are flagged
+        # and floor the verdict at human review.
+        results: Dict[str, Any] = {}
+        failed_agents: List[str] = []
+        for key in REQUIRED_AGENTS:
+            res = state.get(key)
+            results[key] = res
+            if res is None or getattr(res, "status", "failed") != "success":
+                failed_agents.append(key)
+                logs.append(f"Agent {key} missing or failed; treating as full risk (fail-closed).")
 
-        # Fallback values if any agent failed or is missing
-        dev_conf = device_result.confidence_score if device_result and device_result.status == "success" else 1.0
-        kyc_conf = kyc_result.confidence_score if kyc_result and kyc_result.status == "success" else 1.0
-        fraud_conf = fraud_result.confidence_score if fraud_result and fraud_result.status == "success" else 1.0
-        policy_conf = policy_result.confidence_score if policy_result and policy_result.status == "success" else 1.0
-        aml_conf = aml_result.confidence_score if aml_result and aml_result.status == "success" else 1.0
+        def _conf(key: str) -> float:
+            res = results[key]
+            if res is None or getattr(res, "status", "failed") != "success":
+                return 0.0
+            return float(getattr(res, "confidence_score", 0.0))
+
+        device_result = results["device_result"]
+        kyc_result = results["kyc_result"]
+        fraud_result = results["fraud_result"]
+        aml_result = results["aml_result"]
+        policy_result = results["policy_result"]
+        explain_result = results["explainability_result"]
+
+        dev_conf = _conf("device_result")
+        kyc_conf = _conf("kyc_result")
+        fraud_conf = _conf("fraud_result")
+        policy_conf = _conf("policy_result")
+        aml_conf = _conf("aml_result")
 
         # Calculate consensus score: ratio of agents agreeing on approval
         votes = [
@@ -103,13 +132,21 @@ class SupervisorAgent(BaseGovernanceAgent):
 
         logs.append(f"Dynamic Trust Score calculated: {trust_score}/100")
 
-        # 3. Determine final transaction verdict
+        # 3. Determine final transaction verdict.
+        # Any agent failure floors the verdict at human review — a crashed
+        # agent must never silently approve a transaction.
         if not policy_passed or aml_conf < 0.30 or trust_score < 50:
             verdict = "declined"
             reasoning = "Transaction declined: failed strict security and compliance policy limits."
-        elif trust_score < 75 or dev_conf < 0.50 or fraud_conf < 0.50:
+        elif failed_agents or trust_score < 75 or dev_conf < 0.50 or fraud_conf < 0.50:
             verdict = "under_review"
-            reasoning = "Transaction pending: low trust score requires Human-in-the-Loop review."
+            if failed_agents:
+                reasoning = (
+                    "Transaction pending: agent failure(s) "
+                    f"({', '.join(failed_agents)}) require Human-in-the-Loop review."
+                )
+            else:
+                reasoning = "Transaction pending: low trust score requires Human-in-the-Loop review."
         else:
             verdict = "approved"
             reasoning = "Transaction approved: complies with all risk parameters."
@@ -130,6 +167,40 @@ class SupervisorAgent(BaseGovernanceAgent):
             "aml": "approve" if aml_conf >= 0.5 else "decline",
             "policy": "approve" if policy_conf >= 0.5 else "decline",
         }
+
+        # Structured final decision — the single source of truth. The legacy
+        # reasoning string below is rendered FROM this dict so both formats
+        # can never diverge.
+        def _envelope(key: str) -> Dict[str, Any]:
+            res = results[key]
+            if res is None:
+                return {
+                    "agent": key, "status": "failed", "risk_score": 1.0,
+                    "flags": ["agent_missing"], "evidence": {},
+                    "confidence": 0.0, "latency_ms": 0.0,
+                }
+            get = (lambda k, d=None: res.get(k, d)) if isinstance(res, dict) else (lambda k, d=None: getattr(res, k, d))
+            return {
+                "agent": get("agent_name", key) or key,
+                "status": get("status", "failed"),
+                "risk_score": float(get("risk_score", 0.0) or 0.0),
+                "flags": list(get("flags", []) or []),
+                "evidence": dict(get("evidence", {}) or {}),
+                "confidence": float(get("confidence_score", 0.0) or 0.0),
+                "latency_ms": round(float(get("execution_time", 0.0) or 0.0) * 1000, 2),
+            }
+
+        decision = {
+            "verdict": verdict,
+            "trust_score": trust_score,
+            "failed_agents": failed_agents,
+            "per_agent": [_envelope(k) for k in REQUIRED_AGENTS],
+            "consensus_ratio": consensus_ratio,
+            "consensus_votes": dict(state["consensus_votes"]),
+            "trust_weights": weights_config,
+            "trust_reasons": reasons,
+        }
+        state["supervisor_decision"] = decision
 
         return {
             "confidence_score": float(trust_score / 100),

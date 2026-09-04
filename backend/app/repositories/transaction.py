@@ -263,6 +263,14 @@ class TransactionRepository:
                     "status": self._res_get(res, "status"),
                     "reasoning": self._res_get(res, "reasoning"),
                     "logs": self._res_get(res, "logs", []),
+                    # Structured orchestration envelope (AgentResponse
+                    # contract). Defaults keep legacy rows readable.
+                    "agent": self._res_get(res, "agent_name", agent_name),
+                    "risk_score": self._res_get(res, "risk_score", 0.0),
+                    "flags": self._res_get(res, "flags", []),
+                    "evidence": self._res_get(res, "evidence", {}),
+                    "model": self._res_get(res, "model", ""),
+                    "placeholder": self._res_get(res, "placeholder", False),
                 },
                 confidence_score=float(self._res_get(res, "confidence_score", 0.0) or 0.0),
                 latency_ms=float(self._res_get(res, "execution_time", 0.0) or 0.0) * 1000

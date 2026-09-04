@@ -46,14 +46,34 @@ class KYCAgent(BaseGovernanceAgent):
 
         state["kyc_prob"] = risk_score
 
+        # Deterministic rule evaluation (no ML classifier). Labeled as
+        # placeholder so downstream consumers never mistake it for a model
+        # prediction.
+        flags: List[str] = []
+        if status != "active":
+            flags.append("customer_not_active")
+        if risk_level == "high":
+            flags.append("high_risk_tier")
+        if not require_document_match:
+            flags.append("document_unmatched")
+        envelope = {
+            "risk_score": float(risk_score),
+            "flags": flags,
+            "evidence": {"customer_status": status, "risk_level": risk_level},
+            "model": "rules-v1",
+            "placeholder": True,
+        }
+
         if risk_score > 0.50 or status != "active":
             logs.append(f"Warning: Customer KYC state is suspended/inactive or high risk.")
             return {
                 "confidence_score": min(confidence, 0.20 if status != "active" else confidence),
-                "reasoning": f"Critical risk: customer KYC validation failure (KYC risk: {risk_score:.2f})."
+                "reasoning": f"Critical risk: customer KYC validation failure (KYC risk: {risk_score:.2f}).",
+                **envelope,
             }
 
         return {
             "confidence_score": confidence,
-            "reasoning": "Low risk: customer identity matches active registries."
+            "reasoning": "Low risk: customer identity matches active registries.",
+            **envelope,
         }

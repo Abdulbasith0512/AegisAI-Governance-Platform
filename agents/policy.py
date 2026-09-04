@@ -52,10 +52,20 @@ class PolicyAgent(BaseGovernanceAgent):
             logs.append("Warning: Transaction violates deterministic rule constraints.")
             return {
                 "confidence_score": 0.00,
-                "reasoning": "; ".join(reasons)
+                "reasoning": "; ".join(reasons),
+                "risk_score": 1.00,
+                "flags": [f"policy_{p.policy_id}" for p in res.policies_checked if p.status == "fail"],
+                "evidence": {"overall_status": res.overall_status, "policies_checked": res.model_dump().get("policies_checked", [])},
+                "model": "yaml-policy-engine-v1",
+                "placeholder": False,
             }
 
         return {
             "confidence_score": 1.00,
-            "reasoning": "Policy checks passed successfully."
+            "reasoning": "Policy checks passed successfully.",
+            "risk_score": 0.00,
+            "flags": [],
+            "evidence": {"overall_status": res.overall_status},
+            "model": "yaml-policy-engine-v1",
+            "placeholder": False,
         }

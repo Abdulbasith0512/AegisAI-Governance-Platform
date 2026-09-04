@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Dict
 from agents.graph import compiled_graph
+from agents.supervisor import parse_supervisor_verdict
 
 logger = logging.getLogger("aegisai.agents.init")
 
@@ -28,20 +29,18 @@ async def run_governance_graph(transaction: Dict[str, Any]) -> Dict[str, Any]:
             "reasoning": "Internal Agent Framework runtime failure."
         }
         
-    # Parse the compiled verdict string from supervisor's reasoning
+    # Parse the consolidated verdict with the shared supervisor parser
+    # (single implementation — see agents/supervisor.py).
     reasoning_str = supervisor_res.reasoning
-    
-    # Extract keys from consolidated response: "verdict: value | trust_score: value | reasoning: value | explanation: value"
-    parsed_verdict = "declined"
+
+    parsed_verdict = parse_supervisor_verdict(supervisor_res)
     trust_score = 0
     clean_reasoning = "System error"
-    
+
     try:
         parts = reasoning_str.split(" | ")
         for part in parts:
-            if part.startswith("verdict: "):
-                parsed_verdict = part.replace("verdict: ", "")
-            elif part.startswith("trust_score: "):
+            if part.startswith("trust_score: "):
                 trust_score = int(part.replace("trust_score: ", ""))
             elif part.startswith("reasoning: "):
                 clean_reasoning = part.replace("reasoning: ", "")

@@ -78,10 +78,28 @@ class FraudAgent(BaseGovernanceAgent):
             logs.append("Warning: Model indicates high probability of payment or behavioral risk.")
             return {
                 "confidence_score": min(combined_score, 0.45 if is_emulator else combined_score),
-                "reasoning": f"High risk: models flagged suspicious pattern (fraud prob: {fraud_prob:.2f}, behavior prob: {behavior_prob:.2f})."
+                "reasoning": f"High risk: models flagged suspicious pattern (fraud prob: {fraud_prob:.2f}, behavior prob: {behavior_prob:.2f}).",
+                "risk_score": float(1.0 - combined_score),
+                "flags": ["fraud_model_flag"] + (["emulator_trigger"] if is_emulator else []),
+                "evidence": {
+                    "fraud_prob": float(fraud_prob),
+                    "behavior_prob": float(behavior_prob),
+                    "location_match_assumed": True,
+                },
+                "model": "rf-gbc-ensemble-v1+isolation-forest-v1",
+                "placeholder": False,
             }
 
         return {
             "confidence_score": combined_score,
-            "reasoning": "Low risk: transaction matches expected behavior clusters."
+            "reasoning": "Low risk: transaction matches expected behavior clusters.",
+            "risk_score": float(1.0 - combined_score),
+            "flags": [],
+            "evidence": {
+                "fraud_prob": float(fraud_prob),
+                "behavior_prob": float(behavior_prob),
+                "location_match_assumed": True,
+            },
+            "model": "rf-gbc-ensemble-v1+isolation-forest-v1",
+            "placeholder": False,
         }

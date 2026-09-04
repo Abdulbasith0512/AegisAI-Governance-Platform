@@ -47,10 +47,20 @@ class AMLAgent(BaseGovernanceAgent):
             logs.append("Warning: AML structuring or transfer cycle loop indicators matched.")
             return {
                 "confidence_score": confidence,
-                "reasoning": f"High risk: structuring bounds or graph loops detected (AML risk: {risk_score:.2f})."
+                "reasoning": f"High risk: structuring bounds or graph loops detected (AML risk: {risk_score:.2f}).",
+                "risk_score": float(risk_score),
+                "flags": ["structuring_or_cycle"],
+                "evidence": {"amount": amount, "customer_id": str(customer_id), "beneficiary_id": str(beneficiary_id)},
+                "model": "networkx-structuring-v1",
+                "placeholder": False,
             }
 
         return {
             "confidence_score": confidence,
-            "reasoning": "Low risk: no matching money laundering structures found."
+            "reasoning": "Low risk: no matching money laundering structures found.",
+            "risk_score": float(risk_score),
+            "flags": [],
+            "evidence": {"amount": amount, "customer_id": str(customer_id), "beneficiary_id": str(beneficiary_id)},
+            "model": "networkx-structuring-v1",
+            "placeholder": False,
         }
