@@ -57,6 +57,14 @@ class ReviewRepository:
     async def get_detailed_review(self, review_id: uuid.UUID) -> Optional[HumanReview]:
         """
         Eagerly loads all connected telemetry relationships for the Evidence Viewer.
+
+        The review record carries transaction_id / status / comments /
+        reviewer / assigned_at / reviewed_at / sla_deadline on its own row;
+        the original AI decision (trust score, agent predictions, SHAP
+        evidence, policy checks) is reconstructed from the immutable
+        trust_scores / predictions+explanations / policy_checks relations
+        plus the audit ledger — no snapshot columns, so no migration needed
+        and the AI evidence can never be overwritten by a verdict.
         """
         result = await self.db.execute(
             select(HumanReview)
@@ -92,10 +100,15 @@ class ReviewRepository:
         self,
         review_id: uuid.UUID,
         status: str,
-        comments: str
+        comments: str,
+        reviewer_id: Optional[uuid.UUID] = None
     ) -> Optional[HumanReview]:
         """
         Logs case verdict ("approved", "rejected", "escalated") and updates corresponding transaction statuses.
+
+        Stamp-if-empty: reviewer_id is recorded only when the case has no
+        reviewer yet, so explicit assignments are never clobbered while the
+        deciding identity is always preserved.
         """
         # Fetch detailed review
         review = await self.get_detailed_review(review_id)
@@ -105,6 +118,8 @@ class ReviewRepository:
         review.status = status
         review.comments = comments
         review.reviewed_at = datetime.utcnow()
+        if reviewer_id is not None and review.reviewer_id is None:
+            review.reviewer_id = reviewer_id
 
         # Update core transaction status matching auditor decision
         if review.transaction:

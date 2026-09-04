@@ -257,7 +257,23 @@ async def submit_case_action(
     repo = ReviewRepository(db)
     audit_repo = AuditRepository(db)
 
-    res = await repo.submit_review_verdict(review_id, payload.status, payload.comments)
+    # Terminal-state guard: decided cases are immutable (prevents
+    # double-decide races). Escalated cases stay actionable.
+    existing = await repo.get_detailed_review(review_id)
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Case review not found."
+        )
+    if existing.status in ("approved", "rejected"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Case already resolved with status '{existing.status}'."
+        )
+
+    res = await repo.submit_review_verdict(
+        review_id, payload.status, payload.comments, reviewer_id=current_user.id
+    )
     if not res:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -273,4 +289,8 @@ async def submit_case_action(
         metadata={"comments": payload.comments}
     )
 
-    return {"message": f"Auditor action '{payload.status}' submitted successfully."}
+    return {
+        "message": f"Auditor action '{payload.status}' submitted successfully.",
+        "review_id": str(review_id),
+        "reviewer_id": str(res.reviewer_id) if res.reviewer_id else "",
+    }
