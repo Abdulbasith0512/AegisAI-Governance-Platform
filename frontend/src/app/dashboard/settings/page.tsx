@@ -475,7 +475,7 @@ export default function Settings() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', border: '1px solid var(--accent-muted)', fontSize: 'var(--text-13)', color: 'var(--risk-medium-text)' }}>
-              ⚠️ Copy this key now — it will not be shown again.
+              Copy this key now — it will not be shown again.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
@@ -504,7 +504,7 @@ export default function Settings() {
       <Modal open={!!revokeTarget} onClose={() => setRevokeTarget(null)} title="Revoke API Key" width={400}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ padding: '12px', borderRadius: 'var(--radius-md)', background: 'rgba(255,59,59,0.1)', border: '1px solid rgba(255,59,59,0.3)', fontSize: 'var(--text-13)', color: 'var(--risk-critical-text)' }}>
-            🚨 This action is irreversible. Any services using this key will immediately lose access.
+            This action is irreversible. Any services using this key will immediately lose access.
           </div>
           <div style={{ fontSize: 'var(--text-13)', color: 'var(--gray-300)' }}>
             Are you sure you want to revoke <strong style={{ color: 'var(--gray-100)' }}>{revokeTarget?.name}</strong>?

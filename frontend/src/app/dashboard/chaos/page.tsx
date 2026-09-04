@@ -69,7 +69,7 @@ function serviceNode(id: string, label: string, x: number, y: number, health: He
   return {
     id,
     position: { x, y },
-    data: { label: `${health === 'failed' ? '💥' : health === 'degraded' ? '⚠️' : '✓'} ${label}` },
+    data: { label: `${health === 'failed' ? 'Down —' : health === 'degraded' ? 'Degraded —' : ''} ${label}` },
     style: {
       background: `${color}18`,
       border: `1.5px solid ${color}88`,

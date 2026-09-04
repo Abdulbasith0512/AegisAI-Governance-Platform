@@ -1,17 +1,16 @@
 import React from 'react';
-import { ResponsiveContainer } from 'recharts';
 
-// ── Shared Recharts theme colors ───────────────────────────────────────────
+// ── Shared Recharts theme colors (institutional: muted, colorblind-safe) ───
 export const CHART_COLORS = {
-  accent:   '#00d4ff',
-  critical: '#ff3b3b',
-  high:     '#ff7a00',
-  medium:   '#f59e0b',
-  low:      '#22c55e',
-  safe:     '#06b6d4',
-  grid:     '#1c1c24',
-  axis:     '#52525e',
-  tooltip:  { bg: '#1c1c24', border: '#35353f', text: '#c4c4cc' },
+  accent:   '#10B981',
+  critical: '#EF4444',
+  high:     '#F97316',
+  medium:   '#F59E0B',
+  low:      '#34D399',
+  safe:     '#10B981',
+  grid:     'rgba(255,255,255,0.06)',
+  axis:     '#71717A',
+  tooltip:  { bg: '#141417', border: 'rgba(255,255,255,0.12)', text: '#E4E4E7' },
 };
 
 interface ChartContainerProps {
@@ -107,7 +106,7 @@ export const SharedTooltip: React.FC<SharedTooltipProps> = ({
               flexShrink: 0,
             }}
           />
-          <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
             {String(entry.value ?? '')}
           </span>
           {Boolean(entry.name) && (

@@ -230,7 +230,7 @@ export default function PolicyDashboard() {
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded bg-gradient-to-r from-emerald-500 to-teal-500 text-xs font-extrabold text-white uppercase tracking-wider font-mono hover:opacity-90 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                className="w-full py-2.5 rounded-lg bg-white text-sm font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors duration-150"
               >
                 Run Compliance Check
               </button>

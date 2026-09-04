@@ -28,7 +28,7 @@ export const ToastManager: React.FC = () => {
       const id = `toast-${Date.now()}`;
       const toast: Toast = {
         id,
-        title: `${p.riskLevel === 'critical' ? '🚨 Critical' : '⚠️ High'} Risk Alert`,
+        title: `${p.riskLevel === 'critical' ? 'Critical' : 'High'} risk alert`,
         message: `${p.customerName} · $${p.amount.toFixed(2)} · ${p.reason}`,
         riskLevel: p.riskLevel === 'critical' ? 'critical' : 'high',
         ts: new Date().toLocaleTimeString(),

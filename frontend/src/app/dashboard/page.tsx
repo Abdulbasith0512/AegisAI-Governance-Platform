@@ -87,7 +87,7 @@ export default function Overview() {
       const p = e.payload as RiskAlertPayload;
       addFeedItem({
         type: 'risk_alert',
-        message: `🚨 ${p.riskLevel === 'critical' ? 'Critical' : 'High'} risk: ${p.customerName} — $${p.amount.toFixed(2)} · ${p.reason}`,
+        message: `${p.riskLevel === 'critical' ? 'Critical' : 'High'} risk: ${p.customerName} — $${p.amount.toFixed(2)} · ${p.reason}`,
         level: p.riskLevel,
         ts: new Date().toLocaleTimeString(),
       });
@@ -103,7 +103,7 @@ export default function Overview() {
       if (tx.riskLevel === 'low' || tx.riskLevel === 'safe') {
         addFeedItem({
           type: 'new_tx',
-          message: `✓ Approved: ${tx.customerName} — $${tx.amount.toFixed(2)} at ${tx.merchantName}`,
+          message: `Approved: ${tx.customerName} — $${tx.amount.toFixed(2)} at ${tx.merchantName}`,
           level: 'safe',
           ts: new Date().toLocaleTimeString(),
         });

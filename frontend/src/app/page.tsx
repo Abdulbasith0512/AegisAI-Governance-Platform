@@ -11,16 +11,10 @@ import { ModuleGrid } from "@/components/landing/ModuleGrid";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 
 export default function Home() {
-  const gridBgStyle = {
-    backgroundImage:
-      "linear-gradient(to right, rgba(26,160,168,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(26,160,168,0.02) 1px, transparent 1px)",
-    backgroundSize: "40px 40px",
-  };
-
   return (
     <div
-      className="min-h-screen bg-[#070b12] text-[#e2e8f0] font-sans antialiased flex flex-col justify-between selection:bg-[#1AA0A8] selection:text-slate-950 border-t-4 border-[#1AA0A8]"
-      style={gridBgStyle}
+      className="min-h-screen text-[#FAFAFA] font-sans antialiased flex flex-col justify-between selection:bg-[#10B981] selection:text-white"
+      style={{ background: "#0A0A0B" }}
     >
       {/* Top Header Navbar */}
       <LandingHeader />

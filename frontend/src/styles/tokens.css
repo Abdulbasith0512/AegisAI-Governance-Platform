@@ -1,79 +1,80 @@
 /* ==========================================================================
    AegisAI Enterprise Dashboard — Design Token Layer
-   Dark-first. 14-step neutral scale. Single brand accent. Semantic risk states.
+   Ink-first institutional system. Zinc neutrals. Single emerald accent.
+   Reserved semantics: red = risk, amber = warning only.
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* --------------------------------------------------------------------------
-   Surface Elevation System (dark-first)
+   Surface Elevation System (ink-first)
    -------------------------------------------------------------------------- */
 :root {
-  /* ── Surfaces (Fulcrum Edge #050401 Neutral Foundation) ── */
-  --surface-0: #050401;    /* app background base */
-  --surface-1: rgba(12, 10, 6, 0.75);    /* sidebar, glass panels */
-  --surface-2: rgba(18, 15, 8, 0.65);    /* glass cards, rows */
-  --surface-3: rgba(28, 23, 12, 0.75);   /* hover states, elevated cards */
-  --surface-4: rgba(38, 30, 14, 0.85);   /* active/selected states */
-  --surface-glass: rgba(15, 12, 5, 0.55);
+  /* ── Surfaces (neutral ink foundation) ── */
+  --surface-0: #0A0A0B;    /* app background base */
+  --surface-1: #101013;    /* sidebar, topbar */
+  --surface-2: #141417;    /* cards, rows */
+  --surface-3: #1A1A1F;    /* hover states, elevated cards */
+  --surface-4: #222228;    /* active/selected states */
+  --surface-glass: rgba(16, 16, 19, 0.85);
 
-  /* ── Borders ── */
-  --border-0: rgba(251, 191, 36, 0.12);    /* subtle dividers */
-  --border-1: rgba(251, 191, 36, 0.22);    /* card borders */
-  --border-2: rgba(251, 191, 36, 0.45);    /* input borders, focus rings */
-  --border-accent: rgba(251, 191, 36, 0.65); /* accent border */
+  /* ── Borders (neutral, single weight) ── */
+  --border-0: rgba(255, 255, 255, 0.06);    /* subtle dividers */
+  --border-1: rgba(255, 255, 255, 0.08);    /* card borders */
+  --border-2: rgba(255, 255, 255, 0.14);    /* input borders, focus rings */
+  --border-accent: rgba(16, 185, 129, 0.45); /* accent border, sparing use */
   --border-glass: rgba(255, 255, 255, 0.08);
 
-  /* ── Neutral Gray / Dark Scale ── */
-  --gray-950: #050401;
-  --gray-900: #0c0a06;
-  --gray-850: #120f08;
-  --gray-800: #1a160d;
-  --gray-750: #241f13;
-  --gray-700: #332b1b;
-  --gray-600: #4a4029;
-  --gray-500: #695b3d;
-  --gray-400: #8c7c59;
-  --gray-300: #b5a47e;
-  --gray-200: #d4c6a5;
-  --gray-150: #e8ddc2;
-  --gray-100: #f2ebd9;
-  --gray-50:  #faf7ee;
+  /* ── Neutral Zinc Scale ── */
+  --gray-950: #09090B;
+  --gray-900: #101013;
+  --gray-850: #141417;
+  --gray-800: #1A1A1F;
+  --gray-750: #222228;
+  --gray-700: #2E2E35;
+  --gray-600: #52525B;
+  --gray-500: #71717A;
+  --gray-400: #A1A1AA;
+  --gray-300: #C9C9D1;
+  --gray-200: #E4E4E7;
+  --gray-150: #EDEDEF;
+  --gray-100: #F4F4F5;
+  --gray-50:  #FAFAFA;
 
-  /* ── Brand Accent (Fulcrum Warm Amber System) ── */
-  --accent-1:     #FBBF24; /* Primary Accent */
-  --accent:       #FBBF24;
-  --accent-dim:   rgba(251, 191, 36, 0.15);
-  --accent-hover: #F59E0B; /* Secondary Accent */
-  --accent-muted: rgba(251, 191, 36, 0.45);
-  --accent-tertiary: #A5FF2A; /* Reserved contrast moment */
+  /* ── Brand Accent (institutional emerald, used sparingly) ── */
+  --accent-1:     #10B981; /* Primary Accent */
+  --accent:       #10B981;
+  --accent-dim:   rgba(16, 185, 129, 0.12);
+  --accent-hover: #059669;
+  --accent-muted: rgba(16, 185, 129, 0.35);
+  --accent-tertiary: #34D399; /* soft highlight, never neon */
 
-  /* ── Text Colors ── */
-  --text-1: #FBBF24;
-  --text-2: #FFFFFF;
-  --text-3: #b5a47e;
-  --text-muted: #8c7c59;
+  /* ── Text Colors (white-first, never colored body text) ── */
+  --text-1: #FAFAFA;
+  --text-2: #E4E4E7;
+  --text-3: #A1A1AA;
+  --text-muted: #71717A;
 
-  /* ── Risk Semantic Colors ── */
-  --risk-critical:      #ff3b3b;
-  --risk-critical-dim:  rgba(255, 59, 59, 0.15);
-  --risk-critical-text: #ff6b6b;
+  /* ── Risk Semantic Colors (muted fills, no neon) ── */
+  --risk-critical:      #EF4444;
+  --risk-critical-dim:  rgba(239, 68, 68, 0.12);
+  --risk-critical-text: #FCA5A5;
 
-  --risk-high:      #ff7a00;
-  --risk-high-dim:  rgba(255, 122, 0, 0.15);
-  --risk-high-text: #ff9a40;
+  --risk-high:      #F97316;
+  --risk-high-dim:  rgba(249, 115, 22, 0.12);
+  --risk-high-text: #FDBA74;
 
   --risk-medium:      #F59E0B;
-  --risk-medium-dim:  rgba(245, 158, 11, 0.15);
-  --risk-medium-text: #FBBF24;
+  --risk-medium-dim:  rgba(245, 158, 11, 0.12);
+  --risk-medium-text: #FCD34D;
 
-  --risk-low:      #A5FF2A;
-  --risk-low-dim:  rgba(165, 255, 42, 0.15);
-  --risk-low-text: #b8ff4d;
+  --risk-low:      #10B981;
+  --risk-low-dim:  rgba(16, 185, 129, 0.12);
+  --risk-low-text: #6EE7B7;
 
-  --risk-safe:      #22d3ee;
-  --risk-safe-dim:  rgba(34, 211, 238, 0.15);
-  --risk-safe-text: #38bdf8;
+  --risk-safe:      #10B981;
+  --risk-safe-dim:  rgba(16, 185, 129, 0.10);
+  --risk-safe-text: #6EE7B7;
 
   /* ── Status Colors ── */
   --status-success: #22c55e;

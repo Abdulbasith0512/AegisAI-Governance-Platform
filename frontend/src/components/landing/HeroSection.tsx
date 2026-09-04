@@ -6,39 +6,39 @@ import { ArrowRight, Play, CheckCircle2, Activity, Zap, ShieldCheck } from "luci
 
 export function HeroSection() {
   return (
-    <section className="relative pt-12 pb-20 md:pt-20 md:pb-28 overflow-hidden">
-      {/* Background blurs */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] rounded-full bg-emerald-500/8 blur-[140px] pointer-events-none"></div>
-
+    <section className="relative pt-16 pb-20 md:pt-24 md:pb-28 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
         {/* Compliance Badge Pill */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-slate-800 bg-slate-900/80 backdrop-blur-md mb-8 text-xs font-medium text-slate-300">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/10 bg-white/[0.03] mb-8 text-xs font-medium text-zinc-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
           <span>SOC 2 Type II Certified</span>
-          <span className="text-slate-700">•</span>
+          <span className="text-zinc-700">•</span>
           <span>RBI Circular G-20 Compliant</span>
-          <span className="text-slate-700">•</span>
-          <span className="text-emerald-400 font-semibold">EU AI Act Ready</span>
+          <span className="text-zinc-700">•</span>
+          <span className="text-zinc-100 font-semibold">EU AI Act Ready</span>
         </div>
 
-        {/* Modern Sans-Serif Headline */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.08] mb-6 max-w-5xl mx-auto font-sans">
-          Autonomous AI Governance
-          <span className="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-300">
+        {/* Editorial headline — solid white, tight tracking */}
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-5">
+          AI Governance for Banking
+        </p>
+        <h1 className="text-4xl sm:text-6xl lg:text-[4.4rem] font-bold tracking-[-0.03em] text-white leading-[1.04] mb-6 max-w-5xl mx-auto font-sans">
+          Autonomous AI governance
+          <span className="block text-zinc-400">
             built for regulated banking networks.
           </span>
         </h1>
 
         {/* Human-written subheadline */}
-        <p className="text-base sm:text-lg text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed font-sans font-normal">
+        <p className="text-base sm:text-lg text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed font-sans font-normal">
           AegisAI provides real-time active supervision for financial AI agents. Monitor weighted trust scores, audit SHAP feature attributions, enforce hard compliance parameters, and block non-compliant transactions before settlement.
         </p>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
           <Link
             href="/dashboard"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs tracking-wide transition-all duration-200 shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.45)]"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-white hover:bg-zinc-200 text-zinc-950 font-semibold text-sm transition-colors duration-150"
           >
             <span>Launch Operations Console</span>
             <ArrowRight size={16} />
@@ -46,43 +46,43 @@ export function HeroSection() {
 
           <a
             href="#simulator"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 text-slate-200 font-medium text-xs tracking-wide transition-all duration-200 backdrop-blur-md"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-zinc-200 font-medium text-sm transition-colors duration-150"
           >
-            <Play size={14} className="text-emerald-400 fill-emerald-400/20" />
+            <Play size={14} className="text-emerald-400" />
             <span>Test Risk Simulator</span>
           </a>
         </div>
 
-        {/* Metric Bar */}
-        <div className="max-w-4xl mx-auto p-4 rounded-xl border border-slate-800/80 bg-slate-950/60 backdrop-blur-md font-mono text-xs">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-3 text-center border-r border-slate-800/60 last:border-r-0">
-              <div className="text-slate-500 text-[10px] uppercase tracking-wider mb-1">WORM Ledgers</div>
-              <div className="text-white text-sm font-bold flex items-center justify-center gap-1.5">
+        {/* Proof bar — flat stat row */}
+        <div className="max-w-4xl mx-auto rounded-xl border border-white/10 bg-white/[0.02] text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/[0.06] rounded-xl overflow-hidden">
+            <div className="p-4 text-center bg-[#0A0A0B]">
+              <div className="text-zinc-500 text-[10px] uppercase tracking-[0.12em] mb-1.5">WORM Ledgers</div>
+              <div className="text-white text-sm font-semibold flex items-center justify-center gap-1.5 tabular-nums">
                 <CheckCircle2 size={14} className="text-emerald-400" />
-                <span>100% PRISTINE</span>
+                <span>100% pristine</span>
               </div>
             </div>
 
-            <div className="p-3 text-center border-r border-slate-800/60 last:border-r-0">
-              <div className="text-slate-500 text-[10px] uppercase tracking-wider mb-1">Daily Decisions</div>
-              <div className="text-white text-sm font-bold flex items-center justify-center gap-1.5">
-                <Activity size={14} className="text-indigo-400" />
-                <span>4,200 / DAY</span>
+            <div className="p-4 text-center bg-[#0A0A0B]">
+              <div className="text-zinc-500 text-[10px] uppercase tracking-[0.12em] mb-1.5">Daily Decisions</div>
+              <div className="text-white text-sm font-semibold flex items-center justify-center gap-1.5 tabular-nums">
+                <Activity size={14} className="text-zinc-400" />
+                <span>4,200 / day</span>
               </div>
             </div>
 
-            <div className="p-3 text-center border-r border-slate-800/60 last:border-r-0">
-              <div className="text-slate-500 text-[10px] uppercase tracking-wider mb-1">Consensus Uptime</div>
-              <div className="text-white text-sm font-bold flex items-center justify-center gap-1.5">
-                <Zap size={14} className="text-amber-400" />
+            <div className="p-4 text-center bg-[#0A0A0B]">
+              <div className="text-zinc-500 text-[10px] uppercase tracking-[0.12em] mb-1.5">Consensus Uptime</div>
+              <div className="text-white text-sm font-semibold flex items-center justify-center gap-1.5 tabular-nums">
+                <Zap size={14} className="text-zinc-400" />
                 <span>99.98%</span>
               </div>
             </div>
 
-            <div className="p-3 text-center">
-              <div className="text-slate-500 text-[10px] uppercase tracking-wider mb-1">Policy Breaches</div>
-              <div className="text-emerald-400 text-sm font-bold flex items-center justify-center gap-1.5">
+            <div className="p-4 text-center bg-[#0A0A0B]">
+              <div className="text-zinc-500 text-[10px] uppercase tracking-[0.12em] mb-1.5">Policy Breaches</div>
+              <div className="text-emerald-400 text-sm font-semibold flex items-center justify-center gap-1.5 tabular-nums">
                 <ShieldCheck size={14} className="text-emerald-400" />
                 <span>0.00%</span>
               </div>

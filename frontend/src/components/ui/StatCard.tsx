@@ -22,22 +22,23 @@ export const StatCard: React.FC<StatCardProps> = ({
   delta,
   deltaLabel,
   sparkline,
-  sparklineColor = 'var(--accent)',
-  mono = true,
+  sparklineColor = 'var(--accent-1)',
+  mono = false,
   live = false,
   compact = false,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const prevValue = useRef(value);
 
-  // Pulse card when value changes
+  // Subtle border acknowledgement when a live value changes (no glow)
   useEffect(() => {
     if (prevValue.current !== value && cardRef.current) {
       const el = cardRef.current;
-      el.style.borderColor = 'var(--accent-muted)';
-      setTimeout(() => {
+      el.style.borderColor = 'var(--border-2)';
+      const t = setTimeout(() => {
         if (el) el.style.borderColor = '';
-      }, 600);
+      }, 500);
+      return () => clearTimeout(t);
     }
     prevValue.current = value;
   }, [value]);
@@ -79,7 +80,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           </div>
         </div>
         {delta !== undefined && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: deltaColor, fontSize: 'var(--text-12)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: deltaColor, fontSize: 'var(--text-12)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
             <DeltaIcon size={12} />
             {Math.abs(delta)}{deltaLabel}
           </div>
@@ -111,8 +112,8 @@ export const StatCard: React.FC<StatCardProps> = ({
               display: 'flex', alignItems: 'center', gap: 3,
               color: deltaColor,
               fontSize: 'var(--text-11)',
-              fontFamily: 'var(--font-mono)',
               fontWeight: 600,
+              fontVariantNumeric: 'tabular-nums',
             }}
           >
             <DeltaIcon size={11} />

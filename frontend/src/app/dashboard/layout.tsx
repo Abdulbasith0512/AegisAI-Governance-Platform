@@ -1,21 +1,17 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import "../../styles/tokens.css";
 import "../../styles/globals.css";
 import "reactflow/dist/style.css";
-import DotMatrixBackground from "../../components/ui/DotMatrixBackground";
 import {
   LayoutDashboard, ArrowRightLeft, GitBranch, Zap,
   Users, Bot, Shield, Brain, FileText, UserCheck,
   AlertTriangle, BarChart3, Settings, Search,
-  Bell, Sun, Moon, Server, ChevronDown, X, LogOut,
-  User, ChevronLeft, ChevronRight, Home, ShieldAlert, Cpu, Network, TestTube2, Layers
+  Bell, Server, ChevronLeft, ChevronRight, Home, ShieldAlert, Cpu, Network, TestTube2, Layers
 } from "lucide-react";
-
-const UserIcon = User;
 
 // ── Sidebar Navigation Config ──────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -65,7 +61,7 @@ const NAV_GROUPS = [
   },
 ];
 
-// ── Dashboard Layout ───────────────────────────────────────────────────────
+// ── Dashboard Layout (institutional shell: flat ink, neutral chrome) ────────
 export default function DashboardLayout({
   children,
 }: {
@@ -73,11 +69,6 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    Promise.resolve().then(() => setMounted(true));
-  }, []);
 
   return (
     <div
@@ -86,74 +77,86 @@ export default function DashboardLayout({
         display: "flex",
         height: "100vh",
         overflow: "hidden",
-        background: "#050401",
-        color: "#e2e8f0",
-        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+        background: "var(--surface-0)",
+        color: "var(--text-2)",
+        fontFamily: "var(--font-sans)",
         position: "relative",
       }}
     >
-      <DotMatrixBackground />
-
       {/* ── Sidebar ── */}
       <aside
         style={{
-          width: collapsed ? 52 : 220,
+          width: collapsed ? 60 : 232,
           flexShrink: 0,
-          background: "rgba(10, 8, 4, 0.75)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          borderRight: "1px solid rgba(251, 191, 36, 0.18)",
+          background: "var(--surface-1)",
+          borderRight: "1px solid var(--border-1)",
           display: "flex",
           flexDirection: "column",
-          transition: "width 200ms ease",
+          transition: "width 180ms ease",
           overflow: "hidden",
           zIndex: 10,
         }}
       >
-        {/* Logo */}
+        {/* Wordmark */}
         <div
           style={{
-            padding: collapsed ? "14px 10px" : "14px 16px",
-            borderBottom: "1px solid rgba(251, 191, 36, 0.18)",
+            padding: collapsed ? "16px 0" : "16px 18px",
+            borderBottom: "1px solid var(--border-1)",
             display: "flex",
             alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
             gap: 10,
-            minHeight: 52,
+            minHeight: 60,
           }}
         >
           <span
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: 8,
-              background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
+              width: 28,
+              height: 28,
+              borderRadius: 7,
+              background: "#FAFAFA",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontWeight: 800,
-              fontSize: 12,
-              color: "#050401",
-              fontFamily: "monospace",
+              fontSize: 13,
+              color: "#0A0A0B",
+              fontFamily: "var(--font-sans)",
+              letterSpacing: "-0.02em",
               flexShrink: 0,
-              boxShadow: "0 0 10px rgba(251, 191, 36, 0.4)",
             }}
           >
-            Æ
+            A
           </span>
           {!collapsed && (
-            <span
-              style={{
-                fontSize: 14,
-                fontWeight: 800,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                color: "#FBBF24",
-                fontFamily: "monospace",
-                whiteSpace: "nowrap",
-                textShadow: "0 0 8px rgba(251, 191, 36, 0.25)",
-              }}
-            >
-              AegisAI
+            <span style={{ minWidth: 0 }}>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 13.5,
+                  fontWeight: 700,
+                  letterSpacing: "-0.01em",
+                  color: "var(--text-1)",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.2,
+                }}
+              >
+                AegisAI
+              </span>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 10.5,
+                  fontWeight: 500,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--text-muted)",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.4,
+                }}
+              >
+                Governance OS
+              </span>
             </span>
           )}
         </div>
@@ -163,23 +166,22 @@ export default function DashboardLayout({
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: "8px",
+            padding: "10px 8px",
           }}
         >
-          {/* Home link */}
           <Link
             href="/"
             style={{
               display: "flex",
               alignItems: "center",
               gap: 10,
-              padding: collapsed ? "7px 10px" : "7px 10px",
-              borderRadius: 6,
+              padding: "7px 10px",
+              borderRadius: 7,
               fontSize: 13,
-              color: "#71717a",
+              fontWeight: 500,
+              color: "var(--text-3)",
               textDecoration: "none",
-              marginBottom: 8,
-              transition: "background 100ms",
+              marginBottom: 10,
             }}
           >
             <Home size={15} style={{ flexShrink: 0 }} />
@@ -187,17 +189,17 @@ export default function DashboardLayout({
           </Link>
 
           {NAV_GROUPS.map((group) => (
-            <div key={group.label} style={{ marginBottom: 16 }}>
+            <div key={group.label} style={{ marginBottom: 14 }}>
               {!collapsed && (
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 10.5,
                     fontWeight: 600,
-                    letterSpacing: "0.1em",
+                    letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: "#3f3f46",
+                    color: "var(--text-muted)",
                     padding: "0 10px",
-                    marginBottom: 4,
+                    marginBottom: 5,
                   }}
                 >
                   {group.label}
@@ -214,19 +216,19 @@ export default function DashboardLayout({
                       alignItems: "center",
                       gap: 10,
                       padding: "7px 10px",
-                      borderRadius: 6,
+                      borderRadius: 7,
                       fontSize: 13,
-                      fontWeight: isActive ? 600 : 400,
-                      color: isActive ? "white" : "#71717a",
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive ? "var(--text-1)" : "var(--text-3)",
                       textDecoration: "none",
-                      background: isActive ? "#1c1c24" : "transparent",
-                      borderLeft: isActive
-                        ? "2px solid #00d4ff"
-                        : "2px solid transparent",
-                      transition: "all 100ms",
+                      background: isActive ? "rgba(255,255,255,0.06)" : "transparent",
+                      boxShadow: isActive
+                        ? "inset 2px 0 0 var(--accent)"
+                        : "inset 2px 0 0 transparent",
+                      transition: "background 120ms ease",
                     }}
                   >
-                    <item.icon size={15} style={{ flexShrink: 0 }} />
+                    <item.icon size={15} style={{ flexShrink: 0, color: isActive ? "var(--accent-1)" : "inherit" }} />
                     {!collapsed && <span>{item.label}</span>}
                   </Link>
                 );
@@ -238,19 +240,17 @@ export default function DashboardLayout({
         {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           style={{
             padding: "10px",
-            borderTop: "1px solid #1c1c24",
             background: "none",
             border: "none",
-            color: "#52525e",
+            borderTop: "1px solid var(--border-1)",
+            color: "var(--text-muted)",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderTopStyle: "solid",
-            borderTopWidth: 1,
-            borderTopColor: "#1c1c24",
           }}
         >
           {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
@@ -262,29 +262,61 @@ export default function DashboardLayout({
         {/* Topbar */}
         <header
           style={{
-            height: 52,
-            borderBottom: "1px solid #1c1c24",
+            height: 56,
+            borderBottom: "1px solid var(--border-1)",
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            gap: 10,
             padding: "0 16px",
-            background: "#0c0c10",
+            background: "var(--surface-1)",
             flexShrink: 0,
           }}
         >
-          <div style={{ flex: 1 }} />
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              borderRadius: 6,
-              background: "#111118",
-              border: "1px solid #1c1c24",
+              gap: 8,
+              padding: "7px 10px",
+              borderRadius: 8,
+              background: "var(--surface-2)",
+              border: "1px solid var(--border-1)",
+              fontSize: 13,
+              color: "var(--text-muted)",
+              minWidth: 220,
+              maxWidth: 320,
+              flex: 1,
+            }}
+          >
+            <Search size={13} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>Search transactions, agents…</span>
+            <kbd
+              style={{
+                fontSize: 10.5,
+                fontFamily: "var(--font-sans)",
+                background: "var(--surface-3)",
+                border: "1px solid var(--border-1)",
+                borderRadius: 4,
+                padding: "1px 5px",
+                color: "var(--text-muted)",
+              }}
+            >
+              ⌘K
+            </kbd>
+          </div>
+          <div style={{ flex: 1 }} />
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "5px 11px",
+              borderRadius: 999,
+              background: "var(--surface-2)",
+              border: "1px solid var(--border-1)",
               fontSize: 12,
-              fontFamily: "monospace",
-              color: "#22c55e",
+              fontWeight: 500,
+              color: "var(--text-3)",
             }}
           >
             <span
@@ -292,27 +324,43 @@ export default function DashboardLayout({
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: "#22c55e",
-                animation: "pulse 2s ease-in-out infinite",
+                background: "var(--accent-1)",
               }}
             />
             <Server size={11} />
-            <span>live</span>
-          </div>
-          <div
+            <span>Live · Production</span>
+          </span>
+          <button
+            aria-label="Notifications"
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, rgba(0,212,255,0.15), #1c1c24)",
-              border: "1px solid rgba(0,212,255,0.3)",
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: "transparent",
+              border: "1px solid transparent",
+              color: "var(--text-3)",
+              cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 10,
+            }}
+          >
+            <Bell size={15} />
+          </button>
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: "50%",
+              background: "var(--surface-3)",
+              border: "1px solid var(--border-2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 10.5,
               fontWeight: 700,
-              color: "#00d4ff",
-              fontFamily: "monospace",
+              color: "var(--text-2)",
+              letterSpacing: "0.02em",
             }}
           >
             RJ
@@ -323,26 +371,14 @@ export default function DashboardLayout({
         <main
           style={{
             flex: 1,
-            padding: 20,
+            padding: 24,
             overflowY: "auto",
-            background: "#09090b",
+            background: "var(--surface-0)",
           }}
         >
-          {mounted ? children : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--gray-600)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-12)' }}>
-              INITIALIZING OPERATIONS CONSOLE...
-            </div>
-          )}
+          {children}
         </main>
       </div>
-
-      {/* Pulse animation keyframe */}
-      <style jsx global>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
     </div>
   );
 }
