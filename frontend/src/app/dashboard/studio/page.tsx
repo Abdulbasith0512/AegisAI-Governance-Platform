@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Network, Play, FileEdit, Loader2 } from "lucide-react";
 import { ToastBar } from "@/components/ui/ToastBar";
+import { apiUrl } from "@/lib/api";
 
 const TEXT_PRIMARY = "var(--text-1)";
 const TEXT_SECONDARY = "var(--text-2)";
@@ -30,7 +31,7 @@ export default function AIStudioDashboard() {
 
   const fetchWorkflows = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/v1/workflows");
+      const res = await fetch(apiUrl("/api/v1/workflows"));
       if (res.ok) {
         const data = await res.json();
         setWorkflows(data);
@@ -56,7 +57,7 @@ export default function AIStudioDashboard() {
 
   const handleCreateWorkflow = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/v1/workflows", {
+      const res = await fetch(apiUrl("/api/v1/workflows"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: "New Workflow", description: "A new governance workflow." })

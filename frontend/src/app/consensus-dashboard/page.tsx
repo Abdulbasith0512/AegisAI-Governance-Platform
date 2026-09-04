@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api";
 
 // Pre-seeded consensus configurations to display when backend isn't actively running
 const SIMULATED_REPUTATIONS = [
@@ -107,7 +108,7 @@ export default function ConsensusDashboard() {
   useEffect(() => {
     async function loadConsensusData() {
       try {
-        const res = await fetch("http://localhost:8000/api/v1/consensus/history");
+        const res = await fetch(apiUrl("/api/v1/consensus/history"));
         if (res.ok) {
           const data = await res.json();
           const mappedHistory = data.map((item: ConsensusApiItem) => {

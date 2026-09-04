@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, Settings, Database, ServerCrash } from "lucide-react";
 import { ToastBar } from "@/components/ui/ToastBar";
+import { apiUrl } from "@/lib/api";
 
 interface Toast {
   id: string;
@@ -38,7 +39,7 @@ export default function ScenarioBuilder() {
 
   const handleSave = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/v1/simulation/scenarios", {
+      const res = await fetch(apiUrl("/api/v1/simulation/scenarios"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -12,6 +12,31 @@ from app.models.users import User
 
 router: APIRouter = APIRouter(prefix="/reviews", tags=["Human Review Center"])
 
+def _reviewer_display_name(reviewer: User | None) -> str | None:
+    if not reviewer:
+        return None
+    # User model has no first_name/last_name, only email.
+    email = getattr(reviewer, "email", "") or ""
+    return email.split("@")[0] if "@" in email else (email or str(getattr(reviewer, "id", "reviewer")))
+
+def _trust_score_value(transaction) -> float:
+    if transaction and getattr(transaction, "trust_scores", None):
+        # TrustScore model field is `score`, not `trust_score`.
+        return float(getattr(transaction.trust_scores[0], "score", 100.0) or 0)
+    return 100.0
+
+def _trust_warnings(transaction) -> list:
+    if transaction and getattr(transaction, "trust_scores", None):
+        t_record = transaction.trust_scores[0]
+        # TrustScore stores `reasons` dict (no `details` column).
+        reasons = getattr(t_record, "reasons", None) or {}
+        if isinstance(reasons, dict):
+            warnings = reasons.get("warnings", [])
+            return warnings if isinstance(warnings, list) else [warnings]
+        if isinstance(reasons, list):
+            return reasons
+    return []
+
 @router.get("/queue", response_model=List[ReviewQueueResponse])
 async def get_review_queue(
     db: AsyncSession = Depends(get_db),
@@ -33,17 +58,13 @@ async def get_review_queue(
             customer_name = f"{c.first_name} {c.last_name}"
 
         # Resolve trust score
-        trust = 100.0
-        if r.transaction and r.transaction.trust_scores:
-            trust = r.transaction.trust_scores[0].trust_score
+        trust = _trust_score_value(r.transaction)
 
         # Resolve reviewer name
-        reviewer_name = None
-        if r.reviewer:
-            reviewer_name = f"{r.reviewer.first_name} {r.reviewer.last_name}"
+        reviewer_name = _reviewer_display_name(r.reviewer)
 
         # Check if SLA deadline is breached
-        is_sla_breached = datetime.utcnow() > r.sla_deadline
+        is_sla_breached = datetime.now(timezone.utc).replace(tzinfo=None) > r.sla_deadline if r.sla_deadline else False
 
         response.append(ReviewQueueResponse(
             id=r.id,
@@ -79,15 +100,11 @@ async def get_review_history(
             c = r.transaction.account.customer
             customer_name = f"{c.first_name} {c.last_name}"
 
-        trust = 100.0
-        if r.transaction and r.transaction.trust_scores:
-            trust = r.transaction.trust_scores[0].trust_score
+        trust = _trust_score_value(r.transaction)
 
-        reviewer_name = None
-        if r.reviewer:
-            reviewer_name = f"{r.reviewer.first_name} {r.reviewer.last_name}"
+        reviewer_name = _reviewer_display_name(r.reviewer)
 
-        is_sla_breached = r.reviewed_at > r.sla_deadline if r.reviewed_at else False
+        is_sla_breached = r.reviewed_at > r.sla_deadline if (r.reviewed_at and r.sla_deadline) else False
 
         response.append(ReviewQueueResponse(
             id=r.id,
@@ -129,12 +146,8 @@ async def get_review_details(
         customer_name = f"{c.first_name} {c.last_name}"
 
     # 2. Resolve Trust score details
-    trust = 100.0
-    warnings = []
-    if r.transaction and r.transaction.trust_scores:
-        t_record = r.transaction.trust_scores[0]
-        trust = t_record.trust_score
-        warnings = t_record.details.get("warnings", []) if t_record.details else []
+    trust = _trust_score_value(r.transaction)
+    warnings = _trust_warnings(r.transaction)
 
     # 3. Resolve Explainability Traces
     exp_human = "No explanation trace logged for this prediction."
@@ -147,9 +160,10 @@ async def get_review_details(
         if p_record.explanations:
             e_record = p_record.explanations[0]
             exp_human = e_record.human_readable
-            exp_timeline = e_record.decision_timeline.get("events", [])
-            exp_graph = e_record.evidence_graph
-            exp_shap = e_record.feature_importance
+            timeline = getattr(e_record, "decision_timeline", None) or {}
+            exp_timeline = timeline.get("events", []) if isinstance(timeline, dict) else []
+            exp_graph = e_record.evidence_graph or {"nodes": [], "edges": []}
+            exp_shap = e_record.feature_importance or {}
 
     # 4. Resolve compliance policy results
     policy_checks = []
@@ -161,7 +175,13 @@ async def get_review_details(
                 "details": pc.details
             })
 
-    is_sla_breached = (r.reviewed_at > r.sla_deadline) if r.reviewed_at else (datetime.utcnow() > r.sla_deadline)
+    now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+    if r.reviewed_at and r.sla_deadline:
+        is_sla_breached = r.reviewed_at > r.sla_deadline
+    elif r.sla_deadline:
+        is_sla_breached = now_naive > r.sla_deadline
+    else:
+        is_sla_breached = False
 
     return ReviewDetailResponse(
         id=r.id,
@@ -209,7 +229,7 @@ async def assign_case_auditor(
     res = await repo.assign_reviewer(review_id, payload.reviewer_id)
     if not res:
         raise HTTPException(
-            status_code=status.HTTP_440_NOT_FOUND,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Case review not found."
         )
 
@@ -217,7 +237,7 @@ async def assign_case_auditor(
     await audit_repo.log_action(
         actor_id=current_user.id,
         action_type="assign_reviewer",
-        description=f"Case {review_id} assigned to reviewer {reviewer.first_name} {reviewer.last_name}",
+        description=f"Case {review_id} assigned to reviewer {_reviewer_display_name(reviewer)}",
         resource_id=str(review_id)
     )
 

@@ -1,6 +1,7 @@
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 from redis.asyncio import Redis, from_url
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from qdrant_client import QdrantClient
@@ -31,20 +32,25 @@ class Base(DeclarativeBase):
     """
     pass
 
-async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_db_session() -> AsyncGenerator[Optional[AsyncSession], None]:
     """
     FastAPI dependency yielding an asynchronous PostgreSQL database session.
+    Yields None if database is unreachable in development mode.
     """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"PostgreSQL Session error, rolling back: {e}")
+    session = AsyncSessionLocal()
+    try:
+        await session.execute(text("SELECT 1"))
+        yield session
+        await session.commit()
+    except Exception as exc:
+        await session.rollback()
+        if settings.ENVIRONMENT == "development":
+            logger.warning(f"PostgreSQL connection offline ({exc}). Yielding mock session for dev mode.")
+            yield None
+        else:
             raise
-        finally:
-            await session.close()
+    finally:
+        await session.close()
 
 # 2. Redis Connection Manager
 redis_client: Redis = from_url(settings.REDIS_URL, decode_responses=True)

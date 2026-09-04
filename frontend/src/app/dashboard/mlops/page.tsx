@@ -6,6 +6,7 @@ import {
   Sliders, AlertTriangle, CheckCircle, XCircle, Loader2, Database,
   TrendingUp, Clock
 } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Type Definitions
@@ -426,7 +427,7 @@ export default function MLOpsPlatform() {
 
   const loadPlatformData = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/v1/agents");
+      const res = await fetch(apiUrl("/api/v1/agents"));
       if (!res.ok) throw new Error("Failed to load agents");
       const data: AgentProfile[] = await res.json();
       setAgents(data);
@@ -473,10 +474,10 @@ export default function MLOpsPlatform() {
     setDetailsLoading(true);
     try {
       const [vRes, runRes, telRes, histRes] = await Promise.all([
-        fetch(`http://localhost:8000/api/v1/agents/${agent.id}/versions`),
-        fetch(`http://localhost:8000/api/v1/agents/mlflow/runs?agent_id=${agent.id}`),
-        fetch(`http://localhost:8000/api/v1/agents/performance/${agent.id}`),
-        fetch(`http://localhost:8000/api/v1/agents/history/${agent.id}`),
+        fetch(apiUrl(`/api/v1/agents/${agent.id}/versions`)),
+        fetch(apiUrl(`/api/v1/agents/mlflow/runs?agent_id=${agent.id}`)),
+        fetch(apiUrl(`/api/v1/agents/performance/${agent.id}`)),
+        fetch(apiUrl(`/api/v1/agents/history/${agent.id}`)),
       ]);
 
       if (!vRes.ok || !runRes.ok || !telRes.ok || !histRes.ok) {
@@ -526,7 +527,7 @@ export default function MLOpsPlatform() {
     if (!selectedAgent) return;
     setDeployLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/agents/deployments/configure", {
+      const res = await fetch(apiUrl("/api/v1/agents/deployments/configure"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -555,7 +556,7 @@ export default function MLOpsPlatform() {
     if (!selectedAgent) return;
     setRollbackTarget(targetVerId);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/agents/deployments/rollback", {
+      const res = await fetch(apiUrl("/api/v1/agents/deployments/rollback"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -579,7 +580,7 @@ export default function MLOpsPlatform() {
     setRegisterLoading(true);
 
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/agents/${selectedAgent.id}/versions`, {
+      const res = await fetch(apiUrl(`/api/v1/agents/${selectedAgent.id}/versions`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

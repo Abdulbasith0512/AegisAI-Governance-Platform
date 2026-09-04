@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Play, Activity, Clock, ServerCrash, CheckCircle, XCircle } from "lucide-react";
 import { ToastBar } from "@/components/ui/ToastBar";
+import { apiUrl } from "@/lib/api";
 
 /** Shape returned by the simulation run API. */
 interface SimulationScenario {
@@ -59,7 +60,7 @@ export default function LiveSimulation() {
 
   // Fetch initial run state
   useEffect(() => {
-    fetch(`http://localhost:8000/api/v1/simulation/runs/${runId}`)
+    fetch(apiUrl(`/api/v1/simulation/runs/${runId}`))
       .then(res => {
         if (!res.ok) throw new Error("Not OK");
         return res.json();
@@ -75,7 +76,7 @@ export default function LiveSimulation() {
   useEffect(() => {
     if (run?.status === "running") {
       const interval = setInterval(() => {
-        fetch(`http://localhost:8000/api/v1/simulation/runs/${runId}/metrics`)
+        fetch(apiUrl(`/api/v1/simulation/runs/${runId}/metrics`))
           .then(res => {
             if (!res.ok) throw new Error("Not OK");
             return res.json();
@@ -83,7 +84,7 @@ export default function LiveSimulation() {
           .then(data => setMetrics(data))
           .catch(() => {});
           
-        fetch(`http://localhost:8000/api/v1/simulation/runs/${runId}/events?limit=20`)
+        fetch(apiUrl(`/api/v1/simulation/runs/${runId}/events?limit=20`))
           .then(res => {
             if (!res.ok) throw new Error("Not OK");
             return res.json();
@@ -91,7 +92,7 @@ export default function LiveSimulation() {
           .then(data => setEvents(data))
           .catch(() => {});
           
-        fetch(`http://localhost:8000/api/v1/simulation/runs/${runId}`)
+        fetch(apiUrl(`/api/v1/simulation/runs/${runId}`))
           .then(res => {
             if (!res.ok) throw new Error("Not OK");
             return res.json();
@@ -107,7 +108,7 @@ export default function LiveSimulation() {
     if (run?.status !== "pending") return;
     
     try {
-      await fetch(`http://localhost:8000/api/v1/simulation/scenarios/${run.scenario_id}/runs`, { method: "POST" });
+      await fetch(apiUrl(`/api/v1/simulation/scenarios/${run.scenario_id}/runs`), { method: "POST" });
       setRun({ ...run, status: "running" });
     } catch {
       // Mock start

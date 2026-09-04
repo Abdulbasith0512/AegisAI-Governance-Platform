@@ -1,5 +1,6 @@
-from typing import List
-from pydantic import Field
+from typing import List, Union
+import json
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -33,6 +34,30 @@ class Settings(BaseSettings):
         ], 
         description="Allowed Cross-Origin requests paths."
     )
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        # Accept JSON list string from .env ('["http://..."]') or comma-separated string.
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return []
+            if s.startswith("["):
+                try:
+                    parsed = json.loads(s)
+                    if isinstance(parsed, list):
+                        return [str(x).strip() for x in parsed if str(x).strip()]
+                except json.JSONDecodeError:
+                    pass
+            # Fallback: comma-separated
+            return [p.strip().strip('"').strip("'") for p in s.split(",") if p.strip()]
+        return v
+
+    @field_validator("LOG_LEVEL", mode="before")
+    @classmethod
+    def normalize_log_level(cls, v: str) -> str:
+        return str(v).upper() if isinstance(v, str) else v
 
     # Relational Database Connection (PostgreSQL)
     DB_HOST: str = Field(default="localhost")

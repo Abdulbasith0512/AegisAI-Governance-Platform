@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { User, Key, Bell, Shield, Database, X, Copy, Check } from 'lucide-react';
+import { apiUrl } from "@/lib/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface TeamMember {
@@ -130,7 +131,7 @@ export default function Settings() {
     if (!inviteEmail.trim()) return;
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/users/invite", {
+      const response = await fetch(apiUrl("/api/v1/users/invite"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

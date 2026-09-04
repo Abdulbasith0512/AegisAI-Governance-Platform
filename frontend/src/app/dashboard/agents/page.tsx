@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { MOCK_AGENTS } from '@/lib/mockData';
 import { ChartContainer, RiskBadge, SharedTooltip, CHART_COLORS, AXIS_PROPS, GRID_PROPS } from '@/components/ui';
 import { Activity, Cpu, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { apiUrl } from "@/lib/api";
 
 export default function Agents() {
   const [agents, setAgents] = React.useState<any[]>([]);
@@ -13,7 +14,7 @@ export default function Agents() {
   React.useEffect(() => {
     async function loadAgents() {
       try {
-        const res = await fetch("http://localhost:8000/api/v1/agents");
+        const res = await fetch(apiUrl("/api/v1/agents"));
         if (res.ok) {
           const data = await res.json();
           const mapped = data.map((ba: any, idx: number) => {

@@ -47,7 +47,7 @@ services:
       - neo4j_data:/data
       - neo4j_logs:/logs
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p neo4j_password 'RETURN 1' || exit 1"]
+      test: ["CMD-SHELL", "cypher-shell -u $${NEO4J_USER:-neo4j} -p $${NEO4J_PASSWORD:-neo4j_password} 'RETURN 1' || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -100,18 +100,20 @@ services:
     container_name: aegisai-backend
     restart: always
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres_password@postgres:5432/aegisai_db
-      - REDIS_URL=redis://redis:6379/0
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=neo4j_password
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - QDRANT_URL=http://qdrant:6333
-      - ENVIRONMENT=production
-      - SECRET_KEY=b91656ea9c21ef884218ec7e7a85de92a2aef1e1498bdecc01d1d41396d65a7f
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres_password@postgres:5432/aegisai_db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j_password}
+      - QDRANT_HOST=${QDRANT_HOST:-qdrant}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY_must_be_set_in_.env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,16 +125,20 @@ services:
         condition: service_started
 
   # Next.js Frontend Dashboard Client
+  # NOTE: NEXT_PUBLIC_* is baked at `next build` time, so it must be passed
+  # as build arg (see frontend/Dockerfile), not only runtime environment.
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     container_name: aegisai-frontend
     restart: always
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
       - backend
 

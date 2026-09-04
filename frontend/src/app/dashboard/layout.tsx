@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import "../../styles/tokens.css";
 import "../../styles/globals.css";
 import "reactflow/dist/style.css";
+import DotMatrixBackground from "../../components/ui/DotMatrixBackground";
 import {
   LayoutDashboard, ArrowRightLeft, GitBranch, Zap,
   Users, Bot, Shield, Brain, FileText, UserCheck,
@@ -85,29 +86,35 @@ export default function DashboardLayout({
         display: "flex",
         height: "100vh",
         overflow: "hidden",
-        background: "#09090b",
+        background: "#050401",
         color: "#e2e8f0",
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+        position: "relative",
       }}
     >
+      <DotMatrixBackground />
+
       {/* ── Sidebar ── */}
       <aside
         style={{
           width: collapsed ? 52 : 220,
           flexShrink: 0,
-          background: "#0c0c10",
-          borderRight: "1px solid #1c1c24",
+          background: "rgba(10, 8, 4, 0.75)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderRight: "1px solid rgba(251, 191, 36, 0.18)",
           display: "flex",
           flexDirection: "column",
           transition: "width 200ms ease",
           overflow: "hidden",
+          zIndex: 10,
         }}
       >
         {/* Logo */}
         <div
           style={{
             padding: collapsed ? "14px 10px" : "14px 16px",
-            borderBottom: "1px solid #1c1c24",
+            borderBottom: "1px solid rgba(251, 191, 36, 0.18)",
             display: "flex",
             alignItems: "center",
             gap: 10,
@@ -116,18 +123,19 @@ export default function DashboardLayout({
         >
           <span
             style={{
-              width: 24,
-              height: 24,
-              borderRadius: 6,
-              background: "linear-gradient(135deg, #6366f1, #00d4ff)",
+              width: 26,
+              height: 26,
+              borderRadius: 8,
+              background: "linear-gradient(135deg, #FBBF24, #F59E0B)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontWeight: 800,
-              fontSize: 11,
-              color: "white",
+              fontSize: 12,
+              color: "#050401",
               fontFamily: "monospace",
               flexShrink: 0,
+              boxShadow: "0 0 10px rgba(251, 191, 36, 0.4)",
             }}
           >
             Æ
@@ -139,9 +147,10 @@ export default function DashboardLayout({
                 fontWeight: 800,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                color: "white",
+                color: "#FBBF24",
                 fontFamily: "monospace",
                 whiteSpace: "nowrap",
+                textShadow: "0 0 8px rgba(251, 191, 36, 0.25)",
               }}
             >
               AegisAI

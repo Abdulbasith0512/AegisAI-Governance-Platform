@@ -157,7 +157,7 @@ export function GovernanceSimulator() {
                           {scenario.name}
                         </span>
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-400">
-                          ${scenario.amount.toLocaleString()}
+                          ${scenario.amount.toLocaleString('en-US')}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed font-sans">

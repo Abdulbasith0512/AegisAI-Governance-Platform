@@ -5,6 +5,7 @@ import {
   Beaker, Trophy, Activity, AlertTriangle, ShieldCheck, 
   BarChart2, Play, Settings, Plus, Download, RefreshCw, FileText
 } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 export default function ResearchDashboard() {
   const [activeTab, setActiveTab] = useState<string>("overview");
@@ -39,11 +40,11 @@ export default function ResearchDashboard() {
       setLoading(true);
       
       const [rGov, rRep, rFail, rMat, rBench] = await Promise.all([
-        fetch("http://localhost:8000/api/v1/research/governance-score").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/research/reputation").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/research/failure-index").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/research/maturity").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/research/benchmarks").then(r => r.json())
+        fetch(apiUrl("/api/v1/research/governance-score")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/research/reputation")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/research/failure-index")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/research/maturity")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/research/benchmarks")).then(r => r.json())
       ]);
 
       setGovReport(rGov);
@@ -167,7 +168,7 @@ export default function ResearchDashboard() {
     if (!expName) return;
     try {
       const parsedConfig = JSON.parse(expConfig);
-      const res = await fetch("http://localhost:8000/api/v1/research/experiment", {
+      const res = await fetch(apiUrl("/api/v1/research/experiment"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -205,7 +206,7 @@ export default function ResearchDashboard() {
   };
 
   const handleDownloadCSV = () => {
-    window.open("http://localhost:8000/api/v1/research/download/csv", "_blank");
+    window.open(apiUrl("/api/v1/research/download/csv"), "_blank");
   };
 
   if (loading || !govReport) {

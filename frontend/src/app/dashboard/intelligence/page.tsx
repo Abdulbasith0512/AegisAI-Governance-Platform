@@ -5,6 +5,7 @@ import {
   ShieldCheck, BarChart3, Trophy, Activity, AlertOctagon, 
   FileText, Download, Play, RefreshCw, Layers, ShieldAlert, CheckCircle2
 } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 export default function IntelligenceDashboard() {
   const [activeTab, setActiveTab] = useState<string>("overview");
@@ -23,12 +24,12 @@ export default function IntelligenceDashboard() {
     try {
       Promise.resolve().then(() => setLoading(true));
       const [rScore, rRep, rMat, rFail, rBench, rReps] = await Promise.all([
-        fetch("http://localhost:8000/api/v1/intelligence/governance-score").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/intelligence/reputation").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/intelligence/maturity").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/intelligence/failure-index").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/intelligence/benchmarks").then(r => r.json()),
-        fetch("http://localhost:8000/api/v1/intelligence/reports").then(r => r.json()).catch(() => [])
+        fetch(apiUrl("/api/v1/intelligence/governance-score")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/intelligence/reputation")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/intelligence/maturity")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/intelligence/failure-index")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/intelligence/benchmarks")).then(r => r.json()),
+        fetch(apiUrl("/api/v1/intelligence/reports")).then(r => r.json()).catch(() => [])
       ]);
 
       setScoreData(rScore);
@@ -86,7 +87,7 @@ export default function IntelligenceDashboard() {
 
   const triggerReportGeneration = async (type: string, format: string) => {
     try {
-      const res = await fetch("http://localhost:8000/api/v1/intelligence/report/generate", {
+      const res = await fetch(apiUrl("/api/v1/intelligence/report/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ report_type: type, report_format: format })
@@ -111,7 +112,7 @@ export default function IntelligenceDashboard() {
   };
 
   const handleDownload = (id: string) => {
-    window.open(`http://localhost:8000/api/v1/intelligence/report/download/${id}`, "_blank");
+    window.open(apiUrl(`/api/v1/intelligence/report/download/${id}`), "_blank");
   };
 
   if (loading || !scoreData) {

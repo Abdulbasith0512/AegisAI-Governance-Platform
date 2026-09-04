@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { API_BASE_URL, apiUrl } from "@/lib/api";
 
 interface HardwareMetric {
   label: string;
@@ -261,7 +262,7 @@ export default function ObservabilityCenter() {
           </div>
 
           <div className="border-t border-slate-850 pt-4 mt-6">
-            <span className="text-[10px] text-slate-500 font-mono block">Scraper: http://localhost:8000/api/v1/observability/metrics</span>
+            <span className="text-[10px] text-slate-500 font-mono block">Scraper: {`${API_BASE_URL}/api/v1/observability/metrics`}</span>
             <span className="text-[10px] text-slate-500 font-mono block">Interval: 15s scrape interval configured</span>
           </div>
         </div>

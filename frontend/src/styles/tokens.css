@@ -9,61 +9,71 @@
    Surface Elevation System (dark-first)
    -------------------------------------------------------------------------- */
 :root {
-  /* ── Surfaces ── */
-  --surface-0: #09090b;    /* app background */
-  --surface-1: #0f0f14;    /* sidebar, panels */
-  --surface-2: #141419;    /* cards, table rows */
-  --surface-3: #1c1c24;    /* hover states, elevated cards */
-  --surface-4: #24242f;    /* active/selected states */
+  /* ── Surfaces (Fulcrum Edge #050401 Neutral Foundation) ── */
+  --surface-0: #050401;    /* app background base */
+  --surface-1: rgba(12, 10, 6, 0.75);    /* sidebar, glass panels */
+  --surface-2: rgba(18, 15, 8, 0.65);    /* glass cards, rows */
+  --surface-3: rgba(28, 23, 12, 0.75);   /* hover states, elevated cards */
+  --surface-4: rgba(38, 30, 14, 0.85);   /* active/selected states */
+  --surface-glass: rgba(15, 12, 5, 0.55);
 
   /* ── Borders ── */
-  --border-0: #1c1c24;     /* subtle dividers */
-  --border-1: #27272f;     /* card borders */
-  --border-2: #35353f;     /* input borders, focus rings */
-  --border-accent: #00d4ff33; /* accent border (transparent) */
+  --border-0: rgba(251, 191, 36, 0.12);    /* subtle dividers */
+  --border-1: rgba(251, 191, 36, 0.22);    /* card borders */
+  --border-2: rgba(251, 191, 36, 0.45);    /* input borders, focus rings */
+  --border-accent: rgba(251, 191, 36, 0.65); /* accent border */
+  --border-glass: rgba(255, 255, 255, 0.08);
 
-  /* ── Neutral Gray Scale (14 steps) ── */
-  --gray-950: #09090b;
-  --gray-900: #111115;
-  --gray-850: #161619;
-  --gray-800: #1c1c22;
-  --gray-750: #22222a;
-  --gray-700: #2a2a35;
-  --gray-600: #3a3a48;
-  --gray-500: #52525e;
-  --gray-400: #71717a;
-  --gray-300: #a1a1aa;
-  --gray-200: #c4c4cc;
-  --gray-150: #d4d4dc;
-  --gray-100: #e4e4e8;
-  --gray-50:  #f4f4f6;
+  /* ── Neutral Gray / Dark Scale ── */
+  --gray-950: #050401;
+  --gray-900: #0c0a06;
+  --gray-850: #120f08;
+  --gray-800: #1a160d;
+  --gray-750: #241f13;
+  --gray-700: #332b1b;
+  --gray-600: #4a4029;
+  --gray-500: #695b3d;
+  --gray-400: #8c7c59;
+  --gray-300: #b5a47e;
+  --gray-200: #d4c6a5;
+  --gray-150: #e8ddc2;
+  --gray-100: #f2ebd9;
+  --gray-50:  #faf7ee;
 
-  /* ── Brand Accent ── */
-  --accent:       #00d4ff;
-  --accent-dim:   #00d4ff22;
-  --accent-hover: #33ddff;
-  --accent-muted: #00d4ff88;
+  /* ── Brand Accent (Fulcrum Warm Amber System) ── */
+  --accent-1:     #FBBF24; /* Primary Accent */
+  --accent:       #FBBF24;
+  --accent-dim:   rgba(251, 191, 36, 0.15);
+  --accent-hover: #F59E0B; /* Secondary Accent */
+  --accent-muted: rgba(251, 191, 36, 0.45);
+  --accent-tertiary: #A5FF2A; /* Reserved contrast moment */
+
+  /* ── Text Colors ── */
+  --text-1: #FBBF24;
+  --text-2: #FFFFFF;
+  --text-3: #b5a47e;
+  --text-muted: #8c7c59;
 
   /* ── Risk Semantic Colors ── */
   --risk-critical:      #ff3b3b;
-  --risk-critical-dim:  #ff3b3b22;
+  --risk-critical-dim:  rgba(255, 59, 59, 0.15);
   --risk-critical-text: #ff6b6b;
 
   --risk-high:      #ff7a00;
-  --risk-high-dim:  #ff7a0022;
+  --risk-high-dim:  rgba(255, 122, 0, 0.15);
   --risk-high-text: #ff9a40;
 
-  --risk-medium:      #f59e0b;
-  --risk-medium-dim:  #f59e0b22;
-  --risk-medium-text: #fbbf24;
+  --risk-medium:      #F59E0B;
+  --risk-medium-dim:  rgba(245, 158, 11, 0.15);
+  --risk-medium-text: #FBBF24;
 
-  --risk-low:      #22c55e;
-  --risk-low-dim:  #22c55e22;
-  --risk-low-text: #4ade80;
+  --risk-low:      #A5FF2A;
+  --risk-low-dim:  rgba(165, 255, 42, 0.15);
+  --risk-low-text: #b8ff4d;
 
-  --risk-safe:      #06b6d4;
-  --risk-safe-dim:  #06b6d422;
-  --risk-safe-text: #22d3ee;
+  --risk-safe:      #22d3ee;
+  --risk-safe-dim:  rgba(34, 211, 238, 0.15);
+  --risk-safe-text: #38bdf8;
 
   /* ── Status Colors ── */
   --status-success: #22c55e;

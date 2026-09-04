@@ -7,11 +7,11 @@ python_files = ["test_*.py"]
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = []
 line-length = 88
-target-version = "py310"
+target-version = "py312"
 
 [tool.black]
 line-length = 88
-target-version = ['py310']
+target-version = ['py312']
 
 [tool.isort]
 profile = "black"

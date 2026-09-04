@@ -212,6 +212,12 @@ class TransactionRepository:
         )
         return list(result.scalars().all())
 
+    @staticmethod
+    def _res_get(res: Any, key: str, default: Any = None) -> Any:
+        if isinstance(res, dict):
+            return res.get(key, default)
+        return getattr(res, key, default)
+
     async def persist_pipeline_results(
         self,
         transaction_id: uuid.UUID,
@@ -236,12 +242,12 @@ class TransactionRepository:
                 transaction_id=transaction_id,
                 model_version_id=version_id,
                 prediction_output={
-                    "status": res.status,
-                    "reasoning": res.reasoning,
-                    "logs": res.logs
+                    "status": self._res_get(res, "status"),
+                    "reasoning": self._res_get(res, "reasoning"),
+                    "logs": self._res_get(res, "logs", []),
                 },
-                confidence_score=res.confidence_score,
-                latency_ms=res.execution_time * 1000
+                confidence_score=float(self._res_get(res, "confidence_score", 0.0) or 0.0),
+                latency_ms=float(self._res_get(res, "execution_time", 0.0) or 0.0) * 1000
             )
             self.db.add(prediction)
             prediction_map[agent_name] = prediction.id
@@ -309,9 +315,10 @@ class TransactionRepository:
         supervisor_verdict = "approved"
         supervisor_res = state.get("supervisor_result")
         if supervisor_res:
-            if "under_review" in supervisor_res.reasoning.lower():
+            reasoning = str(self._res_get(supervisor_res, "reasoning", "") or "").lower()
+            if "under_review" in reasoning:
                 supervisor_verdict = "under_review"
-            elif "declined" in supervisor_res.reasoning.lower():
+            elif "declined" in reasoning:
                 supervisor_verdict = "declined"
 
         if supervisor_verdict == "under_review":

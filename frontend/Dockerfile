@@ -3,6 +3,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# NEXT_PUBLIC_* vars are baked at build time and must be available here.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Copy dependency configs
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend

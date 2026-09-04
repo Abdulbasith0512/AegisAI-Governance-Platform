@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api";
 
 interface CopilotMessage {
   id: string;
@@ -79,7 +80,7 @@ export default function RegulatoryCopilot() {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/v1/copilot/sessions");
+        const res = await fetch(apiUrl("/api/v1/copilot/sessions"));
         if (res.ok) {
           const data = await res.json();
           if (data && data.length > 0) {
@@ -121,7 +122,7 @@ export default function RegulatoryCopilot() {
 
     try {
       if (isMockSession) {
-        const createRes = await fetch("http://localhost:8000/api/v1/copilot/sessions", {
+        const createRes = await fetch(apiUrl("/api/v1/copilot/sessions"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: activeSession.title })
@@ -132,7 +133,7 @@ export default function RegulatoryCopilot() {
         }
       }
 
-      const queryRes = await fetch(`http://localhost:8000/api/v1/copilot/sessions/${sessionUuid}/query`, {
+      const queryRes = await fetch(apiUrl(`/api/v1/copilot/sessions/${sessionUuid}/query`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: text })
@@ -205,7 +206,7 @@ export default function RegulatoryCopilot() {
     const title = `Audit Conversation #${sessions.length + 1}`;
     
     try {
-      const res = await fetch("http://localhost:8000/api/v1/copilot/sessions", {
+      const res = await fetch(apiUrl("/api/v1/copilot/sessions"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title })

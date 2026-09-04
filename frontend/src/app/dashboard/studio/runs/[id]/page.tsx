@@ -43,44 +43,82 @@ export default function WorkflowExecution() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 80px)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 16px 0" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 80px)", gap: 16 }}>
+      {/* Header Bar */}
+      <div className="glass-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => router.push("/dashboard/studio")} style={{ background: "none", border: "none", color: "var(--text-2)", cursor: "pointer" }}>
-            <ArrowLeft size={20} />
+          <button 
+            onClick={() => router.push("/dashboard/studio")} 
+            style={{ 
+              background: "rgba(251, 191, 36, 0.1)", 
+              border: "1px solid rgba(251, 191, 36, 0.25)", 
+              borderRadius: "8px",
+              padding: "6px",
+              color: "#FBBF24", 
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center"
+            }}
+          >
+            <ArrowLeft size={18} />
           </button>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text-1)" }}>Execute Workflow: {workflowId}</h1>
+          <div>
+            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#8c7c59" }}>Workflow Executor</div>
+            <h1 style={{ fontSize: 18, fontWeight: 700, color: "#FBBF24", textShadow: "0 0 10px rgba(251, 191, 36, 0.2)" }}>
+              {workflowId}
+            </h1>
+          </div>
         </div>
         
         <button 
           onClick={handleExecute} 
           disabled={isRunning}
           style={{
-            background: isRunning ? "var(--surface-3)" : "var(--accent-1)", 
-            color: isRunning ? "var(--text-3)" : "#fff", 
-            border: "none", borderRadius: "6px", padding: "6px 12px", 
-            fontSize: 13, cursor: isRunning ? "not-allowed" : "pointer", 
-            display: "flex", alignItems: "center", gap: 6
+            background: isRunning 
+              ? "rgba(45, 38, 20, 0.6)" 
+              : "linear-gradient(135deg, #FBBF24, #F59E0B)", 
+            color: isRunning ? "#8c7c59" : "#050401", 
+            fontWeight: 600,
+            border: isRunning ? "1px solid rgba(251, 191, 36, 0.2)" : "none", 
+            borderRadius: "10.5px", 
+            padding: "8px 16px", 
+            fontSize: 13, 
+            cursor: isRunning ? "not-allowed" : "pointer", 
+            display: "flex", 
+            alignItems: "center", 
+            gap: 8,
+            boxShadow: isRunning ? "none" : "0 0 16px rgba(251, 191, 36, 0.35)",
+            transition: "all 0.2s ease"
           }}
         >
-          {isRunning ? <Loader2 size={14} className="spin-animation" /> : <Play size={14} />} 
-          {isRunning ? "Running..." : "Start Execution"}
+          {isRunning ? <Loader2 size={16} className="spin-animation" /> : <Play size={16} />} 
+          {isRunning ? "Executing Run..." : "Start Execution"}
         </button>
       </div>
 
       <div style={{ display: "flex", flex: 1, gap: 16 }}>
         {/* Left: Input parameters */}
-        <div style={{ 
-          width: "300px", background: "var(--surface-2)", border: "1px solid var(--border-1)", 
-          borderRadius: "var(--radius-lg)", padding: "16px", display: "flex", flexDirection: "column", gap: 12 
+        <div className="glass-card" style={{ 
+          width: "320px", padding: "16px", display: "flex", flexDirection: "column", gap: 12 
         }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-2)" }}>Input Payload</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: "#FBBF24", textTransform: "uppercase", letterSpacing: "0.06em" }}>Input Payload</h3>
+            <span style={{ fontSize: 11, color: "#8c7c59", fontFamily: "monospace" }}>JSON</span>
+          </div>
           <textarea 
             disabled={isRunning}
             style={{ 
-              flex: 1, background: "var(--surface-1)", border: "1px solid var(--border-1)", 
-              borderRadius: "6px", padding: "12px", color: "var(--text-1)", fontFamily: "monospace", 
-              fontSize: 12, resize: "none" 
+              flex: 1, 
+              background: "rgba(10, 8, 4, 0.75)", 
+              border: "1px solid rgba(251, 191, 36, 0.2)", 
+              borderRadius: "8px", 
+              padding: "12px", 
+              color: "#faf7ee", 
+              fontFamily: "'JetBrains Mono', monospace", 
+              fontSize: 12, 
+              resize: "none",
+              outline: "none",
+              boxShadow: "inset 0 2px 4px rgba(0,0,0,0.5)"
             }}
             defaultValue={JSON.stringify({
               transaction_id: "tx-123456",
@@ -92,30 +130,44 @@ export default function WorkflowExecution() {
         </div>
 
         {/* Right: Execution Logs */}
-        <div style={{ 
-          flex: 1, background: "var(--surface-1)", border: "1px solid var(--border-1)", 
-          borderRadius: "var(--radius-lg)", overflow: "hidden", display: "flex", flexDirection: "column" 
+        <div className="glass-card" style={{ 
+          flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" 
         }}>
-          <div style={{ padding: "16px", borderBottom: "1px solid var(--border-1)", background: "var(--surface-2)" }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)" }}>Execution Logs</h3>
+          <div style={{ 
+            padding: "14px 16px", 
+            borderBottom: "1px solid rgba(251, 191, 36, 0.18)", 
+            background: "rgba(12, 10, 6, 0.6)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: "#FBBF24", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Execution Stream
+            </h3>
+            <div style={{ fontSize: 11, color: "#8c7c59", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: isRunning ? "#FBBF24" : "#A5FF2A", display: "inline-block" }} />
+              {isRunning ? "STREAMING" : "READY"}
+            </div>
           </div>
           
           <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 8 }}>
             {logs.length === 0 ? (
-              <div style={{ color: "var(--text-3)", textAlign: "center", marginTop: 40, fontSize: 13 }}>
-                Click &quot;Start Execution&quot; to run the workflow.
+              <div style={{ color: "#8c7c59", textAlign: "center", marginTop: 60, fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>
+                // Ready for workflow execution. Click &quot;Start Execution&quot; above.
               </div>
             ) : (
               logs.map((log, i) => (
                 <div key={i} style={{ 
                   display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", 
-                  background: "var(--surface-2)", borderRadius: "6px", border: "1px solid var(--border-1)" 
+                  background: "rgba(10, 8, 4, 0.7)", borderRadius: "8px", 
+                  border: "1px solid rgba(251, 191, 36, 0.15)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)"
                 }}>
-                  {log.status === "success" ? <CheckCircle size={16} color="#22c55e" /> : 
-                   log.status === "pending" ? <Clock size={16} color="var(--accent-1)" /> : 
-                   <XCircle size={16} color="#ef4444" />}
+                  {log.status === "success" ? <CheckCircle size={16} color="#A5FF2A" /> : 
+                   log.status === "pending" ? <Clock size={16} color="#FBBF24" /> : 
+                   <XCircle size={16} color="#ff3b3b" />}
                   
-                  <span style={{ fontSize: 13, color: "var(--text-1)", fontFamily: "monospace" }}>
+                  <span style={{ fontSize: 13, color: "#FFFFFF", fontFamily: "'JetBrains Mono', monospace" }}>
                     {log.msg}
                   </span>
                 </div>
@@ -124,11 +176,7 @@ export default function WorkflowExecution() {
           </div>
         </div>
       </div>
-      
-      <style>{`
-        .spin-animation { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 }
+

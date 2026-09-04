@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ServerCrash, Play, Settings, Activity, Database, Users, ShieldAlert, Cpu } from "lucide-react";
 import { ToastBar } from "@/components/ui/ToastBar";
+import { apiUrl } from "@/lib/api";
 
 export default function SimulationDashboard() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export default function SimulationDashboard() {
   const [toasts, setToasts] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/simulation/scenarios")
+    fetch(apiUrl("/api/v1/simulation/scenarios"))
       .then(res => res.json())
       .then(data => setScenarios(data))
       .catch(() => {
@@ -28,7 +29,7 @@ export default function SimulationDashboard() {
 
   const handleRunNow = async (scenario: any) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/simulation/scenarios/${scenario.id}/runs`, {
+      const res = await fetch(apiUrl(`/api/v1/simulation/scenarios/${scenario.id}/runs`), {
         method: "POST",
       });
       if (!res.ok) throw new Error("Not OK");

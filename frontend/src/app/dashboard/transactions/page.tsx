@@ -15,6 +15,7 @@ import { MOCK_TRANSACTIONS, generateTransaction } from '@/lib/mockData';
 import type { Transaction, RiskLevel, TxStatus } from '@/lib/mockData';
 import { eventStream } from '@/lib/eventStream';
 import type { StreamEvent } from '@/lib/eventStream';
+import { apiUrl } from "@/lib/api";
 
 // Amount histogram data
 function buildAmountHistogram(txs: Transaction[]) {
@@ -87,7 +88,7 @@ export default function Transactions() {
   useEffect(() => {
     async function loadHistory() {
       try {
-        const res = await fetch("http://localhost:8000/api/v1/transactions/history");
+        const res = await fetch(apiUrl("/api/v1/transactions/history"));
         if (res.ok) {
           const data = await res.json();
           const mapped = data.map((t: any) => ({
@@ -279,7 +280,7 @@ function TxDetail({ tx }: { tx: Transaction }) {
     async function loadDetails() {
       try {
         setLoading(true);
-        const res = await fetch(`http://localhost:8000/api/v1/transactions/${tx.id}`);
+        const res = await fetch(apiUrl(`/api/v1/transactions/${tx.id}`));
         if (res.ok) {
           const data = await res.json();
           setDetails(data);
@@ -388,4 +389,3 @@ function TxDetail({ tx }: { tx: Transaction }) {
     </div>
   );
 }
-
