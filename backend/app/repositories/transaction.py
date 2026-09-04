@@ -382,3 +382,21 @@ class TransactionRepository:
             self.db.add(hr)
 
         await self.db.commit()
+
+        # 7. Graph write-through (best-effort, never breaks the money path).
+        try:
+            from app.services.knowledge_graph import KnowledgeGraphService
+
+            tx_state = state.get("transaction", {}) or {}
+            synced = KnowledgeGraphService().sync_transaction_to_graph(
+                customer_id=str(tx_state.get("customer_id", "")),
+                account_id=str(tx_state.get("account_id", "")),
+                transaction_id=str(transaction_id),
+                amount=float(tx_state.get("amount", 0.0) or 0.0),
+                beneficiary_id=tx_state.get("beneficiary_id"),
+                timestamp=datetime.utcnow().isoformat(),
+            )
+            if not synced:
+                logger.debug("Graph write-through skipped (Neo4j unavailable).")
+        except Exception as e:
+            logger.warning("Graph write-through failed: %s", e)

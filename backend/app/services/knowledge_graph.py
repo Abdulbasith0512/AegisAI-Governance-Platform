@@ -18,7 +18,7 @@ class KnowledgeGraphService:
         """
         if self.db.use_mock:
             logger.info("Mock Knowledge Graph seeded successfully.")
-            return {"message": "Mock knowledge graph seeded in emulator memory."}
+            return {"message": "Neo4j unavailable: nothing seeded (use scripts/seed_neo4j_dev.py with a live instance for synthetic dev data)."}
 
         cypher = """
         // Clean existing schema
@@ -72,35 +72,11 @@ class KnowledgeGraphService:
     def get_graph_visualization(self) -> Dict[str, List[Dict[str, Any]]]:
         """
         Returns full node and relationship link maps formatted for D3 graph visuals.
+        Returns an explicitly labeled empty graph when Neo4j is unreachable
+        instead of fabricated demo nodes.
         """
-        # If in Mock mode, return a gorgeous mock graph structures
         if self.db.use_mock:
-            return {
-                "nodes": [
-                    {"id": "cust-1", "label": "Customer", "name": "Alice Smith", "risk": 15},
-                    {"id": "cust-2", "label": "Customer", "name": "Bob Johnson", "risk": 85},
-                    {"id": "acc-101", "label": "Account", "name": "Account 101", "risk": 10},
-                    {"id": "acc-102", "label": "Account", "name": "Account 102", "risk": 80},
-                    {"id": "acc-103", "label": "Account", "name": "Account 103", "risk": 15},
-                    {"id": "dev-1", "label": "Device", "name": "iPhone 15 iPhone"},
-                    {"id": "merch-99", "label": "Merchant", "name": "Binance Escrow"},
-                    {"id": "tx-1001", "label": "Transaction", "name": "Tx 1001 ($1500)"},
-                    {"id": "agent-fraud", "label": "AIAgent", "name": "Fraud Agent"},
-                    {"id": "policy-aml-1", "label": "Policy", "name": "AML Limit Rule"},
-                    {"id": "alert-critical", "label": "Alert", "name": "Critical Alert"}
-                ],
-                "links": [
-                    {"source": "cust-1", "target": "acc-101", "type": "OWNS"},
-                    {"source": "cust-2", "target": "acc-102", "type": "OWNS"},
-                    {"source": "cust-1", "target": "dev-1", "type": "USES"},
-                    {"source": "acc-101", "target": "acc-102", "type": "TRANSFERRED_TO"},
-                    {"source": "acc-102", "target": "acc-103", "type": "TRANSFERRED_TO"},
-                    {"source": "acc-103", "target": "acc-101", "type": "TRANSFERRED_TO"},
-                    {"source": "tx-1001", "target": "agent-fraud", "type": "FLAGGED_BY"},
-                    {"source": "tx-1001", "target": "policy-aml-1", "type": "VIOLATED"},
-                    {"source": "tx-1001", "target": "alert-critical", "type": "FLAGGED_BY"}
-                ]
-            }
+            return {"nodes": [], "links": [], "mock": True, "reason": "neo4j_unavailable"}
 
         cypher = """
         MATCH (n)
@@ -146,14 +122,10 @@ class KnowledgeGraphService:
     def find_shortest_fraud_path(self, source_id: str, target_id: str) -> Dict[str, Any]:
         """
         Executes shortest path hops traversal between two graph accounts.
+        Returns path_found=False (never invented hops) when unreachable.
         """
         if self.db.use_mock:
-            # Emulate shortest hop lists
-            return {
-                "path_found": True,
-                "hops": [source_id, "acc-102", target_id],
-                "relationships": ["TRANSFERRED_TO", "TRANSFERRED_TO"]
-            }
+            return {"path_found": False, "hops": [], "relationships": [], "reason": "neo4j_unavailable"}
 
         cypher = """
         MATCH (start:Account {id: $source}), (end:Account {id: $target})
@@ -180,11 +152,9 @@ class KnowledgeGraphService:
         if self.db.use_mock:
             return {
                 "start_node": start_node_id,
-                "base_risk": 85.0,
-                "propagated_risk_map": {
-                    "acc-102": 59.5,
-                    "acc-103": 41.6
-                }
+                "base_risk": 0.0,
+                "propagated_risk_map": {},
+                "reason": "neo4j_unavailable",
             }
 
         # Cypher risk propagation down relationships (propagates 70% risk to targets per hop)
@@ -212,28 +182,18 @@ class KnowledgeGraphService:
 
     def detect_communities_clustering(self) -> List[Dict[str, Any]]:
         """
-        Clusters accounts into community buckets based on Weakly Connected Component simulations.
+        Community detection requires the Neo4j Graph Data Science library,
+        which is not part of this deployment. Explicitly unimplemented
+        rather than returning hard-coded communities.
         """
-        if self.db.use_mock:
-            return [
-                {"community_id": 1, "nodes": ["cust-1", "acc-101", "dev-1"]},
-                {"community_id": 2, "nodes": ["cust-2", "acc-102", "acc-103"]}
-            ]
-            
-        # Simulates community divisions
-        return [
-            {"community_id": 1, "nodes": ["cust-1", "acc-101"]},
-            {"community_id": 2, "nodes": ["cust-2", "acc-102"]}
-        ]
+        return [{"status": "not_implemented", "reason": "requires_gds_library"}]
 
     def discover_cyclic_patterns(self) -> List[Dict[str, Any]]:
         """
         Queries circular transfers patterns (A -> B -> C -> A) matching laundry networks.
         """
         if self.db.use_mock:
-            return [
-                {"pattern_type": "Circular Transfer Loop", "nodes": ["acc-101", "acc-102", "acc-103", "acc-101"]}
-            ]
+            return []
 
         cypher = """
         MATCH (a:Account)-[:TRANSFERRED_TO]->(b:Account)-[:TRANSFERRED_TO]->(c:Account)-[:TRANSFERRED_TO]->(a)
@@ -249,3 +209,174 @@ class KnowledgeGraphService:
                     "nodes": [row["a_id"], row["b_id"], row["c_id"], row["a_id"]]
                 })
             return loops
+
+    # ------------------------------------------------------------------
+    # Live transaction relationship analysis (AML agent entry point)
+    # ------------------------------------------------------------------
+    def sync_transaction_to_graph(
+        self,
+        customer_id: str,
+        account_id: str,
+        transaction_id: str,
+        amount: float,
+        beneficiary_id: str | None = None,
+        timestamp: str | None = None,
+    ) -> bool:
+        """Idempotent write-through of one intercept into Neo4j.
+
+        MERGEs Customer/Account/Transaction nodes plus TRANSFERRED_TO edges
+        so relationship analysis reads real traffic. Returns False (never
+        raises) when Neo4j is unreachable — the money path must not break.
+        """
+        if self.db.use_mock:
+            return False
+        cypher = """
+        MERGE (c:Customer {id: $customer_id})
+        MERGE (a:Account {id: $account_id})
+        MERGE (c)-[:OWNS]->(a)
+        MERGE (t:Transaction {id: $tx_id})
+        SET t.amount = $amount, t.timestamp = $timestamp
+        MERGE (a)-[:INITIATED]->(t)
+        """
+        params: Dict[str, Any] = {
+            "customer_id": str(customer_id),
+            "account_id": str(account_id),
+            "tx_id": str(transaction_id),
+            "amount": float(amount),
+            "timestamp": timestamp,
+        }
+        if beneficiary_id:
+            cypher += """
+            MERGE (b:Account {id: $beneficiary_id})
+            MERGE (a)-[r:TRANSFERRED_TO]->(b)
+            SET r.amount = $amount, r.timestamp = $timestamp
+            """
+            params["beneficiary_id"] = str(beneficiary_id)
+        try:
+            with self.db.get_session() as session:
+                session.run(cypher, params)
+            return True
+        except Exception as e:
+            logger.warning("Graph write-through failed: %s", e)
+            return False
+
+    def analyze_transaction_relationships(
+        self,
+        customer_id: str,
+        account_id: str,
+        beneficiary_id: str | None = None,
+        amount: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Analyze live graph relationships for one transaction.
+
+        Returns {patterns, related_entities, graph_evidence, data_source}.
+        Every finding cites the Cypher rows behind it; an unreachable
+        graph yields empty patterns with data_source="unavailable".
+        """
+        if self.db.use_mock:
+            return {
+                "patterns": [],
+                "related_entities": [],
+                "graph_evidence": {"reason": "neo4j_unavailable"},
+                "data_source": "unavailable",
+            }
+        try:
+            with self.db.get_session() as session:
+                ego = session.run(
+                    """
+                    MATCH (a:Account {id: $account_id})-[r:TRANSFERRED_TO]->(t:Account)
+                    RETURN count(r) AS edge_count,
+                           count(DISTINCT t) AS distinct_targets,
+                           coalesce(sum(r.amount), 0.0) AS total_volume
+                    """,
+                    {"account_id": str(account_id)},
+                ).data()
+                ego = ego[0] if ego else {"edge_count": 0, "distinct_targets": 0, "total_volume": 0.0}
+
+                cycles = session.run(
+                    """
+                    MATCH (a:Account {id: $account_id})-[:TRANSFERRED_TO]->(b:Account)
+                          -[:TRANSFERRED_TO]->(c:Account)-[:TRANSFERRED_TO]->(a)
+                    RETURN DISTINCT [a.id, b.id, c.id, a.id] AS loop
+                    """,
+                    {"account_id": str(account_id)},
+                ).data()
+
+                chain = {"path_found": False, "hops": [], "hop_count": 0}
+                if beneficiary_id:
+                    rows = session.run(
+                        """
+                        MATCH (s:Account {id: $source}), (e:Account {id: $target})
+                        MATCH p = shortestPath((s)-[:TRANSFERRED_TO*..6]->(e))
+                        RETURN [n IN nodes(p) | n.id] AS hops
+                        """,
+                        {"source": str(account_id), "target": str(beneficiary_id)},
+                    ).data()
+                    if rows and rows[0].get("hops"):
+                        chain = {
+                            "path_found": True,
+                            "hops": rows[0]["hops"],
+                            "hop_count": len(rows[0]["hops"]) - 1,
+                        }
+
+                neighbors = session.run(
+                    """
+                    MATCH (a:Account {id: $account_id})-[:TRANSFERRED_TO]->(t:Account)
+                    RETURN DISTINCT t.id AS id LIMIT 25
+                    """,
+                    {"account_id": str(account_id)},
+                ).data()
+        except Exception as e:
+            logger.warning("Graph relationship analysis failed: %s", e)
+            return {
+                "patterns": [],
+                "related_entities": [],
+                "graph_evidence": {"reason": "query_failed"},
+                "data_source": "unavailable",
+            }
+
+        patterns: List[Dict[str, Any]] = []
+        edge_count = int(ego.get("edge_count") or 0)
+        distinct = int(ego.get("distinct_targets") or 0)
+        if cycles:
+            patterns.append({
+                "pattern_type": "circular_transfer_loop",
+                "severity": "high",
+                "loops": [row["loop"] for row in cycles],
+            })
+        if chain["path_found"] and chain["hop_count"] >= 3:
+            patterns.append({
+                "pattern_type": "unusual_chain",
+                "severity": "medium",
+                "hops": chain["hops"],
+                "hop_count": chain["hop_count"],
+            })
+        if edge_count >= 10 and distinct >= 5:
+            patterns.append({
+                "pattern_type": "dense_relationships",
+                "severity": "medium",
+                "edge_count": edge_count,
+                "distinct_targets": distinct,
+            })
+        if edge_count >= 5 and float(amount) >= 4500.0:
+            patterns.append({
+                "pattern_type": "rapid_movement",
+                "severity": "medium",
+                "edge_count": edge_count,
+                "amount": float(amount),
+            })
+
+        return {
+            "patterns": patterns,
+            "related_entities": [
+                {"id": row["id"], "label": "Account"} for row in neighbors
+            ],
+            "graph_evidence": {
+                "ego_edge_count": edge_count,
+                "ego_distinct_targets": distinct,
+                "ego_total_volume": float(ego.get("total_volume") or 0.0),
+                "chain": chain,
+                "cycle_count": len(cycles),
+            },
+            "data_source": "neo4j",
+        }

@@ -73,6 +73,8 @@ async def intercept_transaction(
         "transaction": {
             "id": tx_id,
             "customer_id": payload.customer_id,
+            "account_id": str(account.id),
+            "beneficiary_id": str(beneficiary_id) if beneficiary_id else None,
             "amount": payload.amount,
             "currency": payload.currency,
             "location": payload.location,
