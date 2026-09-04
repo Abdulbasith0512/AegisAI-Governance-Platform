@@ -19,15 +19,28 @@ class BeneficiaryTelemetry(BaseModel):
     bank_code: str = Field(..., description="Routing bank code.")
     nickname: Optional[str] = None
 
+class TransactionHistoryItem(BaseModel):
+    """Single historical transaction entry supplied by the caller for AML context."""
+    amount: float = Field(..., gt=0.0, description="Historical transaction amount.")
+    timestamp: Optional[datetime] = None
+    counterparty: Optional[str] = None
+    status: Optional[str] = None
+
 class TransactionInterceptRequest(BaseModel):
     """Payload representing a transaction intercepted by the governance control plane."""
     transaction_id: Optional[uuid.UUID] = None
     customer_id: uuid.UUID = Field(..., description="ID of the initiating customer.")
     merchant_id: Optional[uuid.UUID] = None
+    merchant_category: Optional[str] = Field(None, min_length=2, max_length=10, description="Merchant category code (MCC).")
     amount: float = Field(..., gt=0.0, description="Transaction amount.")
     currency: str = Field("USD", min_length=3, max_length=3, description="ISO 3-letter currency code.")
     location: Optional[str] = None
     device: Optional[DeviceTelemetry] = None
+    device_id: Optional[str] = Field(None, description="Device identifier alias (maps to device fingerprint when device object is absent).")
+    ip_address: Optional[str] = Field(None, description="Source IP address (maps into device telemetry when device object is absent).")
+    account_age_days: Optional[int] = Field(None, ge=0, description="Account age in days. Derived from account record when omitted.")
+    failed_attempts: int = Field(0, ge=0, description="Recent failed attempt count for this customer.")
+    transaction_history: Optional[List[TransactionHistoryItem]] = Field(None, description="Caller-supplied recent history for AML context.")
     channel: str = Field("mobile", description="Channel of execution (mobile, web, atm).")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     beneficiary: Optional[BeneficiaryTelemetry] = None

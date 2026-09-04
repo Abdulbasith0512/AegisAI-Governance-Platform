@@ -1,5 +1,6 @@
 import uuid
 import time
+import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,6 +24,8 @@ from agents.supervisor import parse_supervisor_verdict
 
 router = APIRouter(prefix="/transactions", tags=["Transactions Registry"])
 
+logger = logging.getLogger("aegisai.api.transactions")
+
 @router.post("/intercept", response_model=TransactionInterceptResponse, status_code=status.HTTP_201_CREATED)
 async def intercept_transaction(
     payload: TransactionInterceptRequest,
@@ -38,12 +41,26 @@ async def intercept_transaction(
     audit_repo = AuditRepository(db)
 
     tx_id = payload.transaction_id or uuid.uuid4()
-    
+    logger.info("Intercept attempt tx_id=%s customer=%s amount=%s %s", tx_id, payload.customer_id, payload.amount, payload.currency)
+
     # 1. Resolve customer profile and account dependencies
     account = await tx_repo.get_or_create_customer_and_account(payload.customer_id)
-    merchant_id = await tx_repo.get_or_create_merchant(payload.merchant_id)
-    device_id = await tx_repo.get_or_create_device(payload.device.model_dump() if payload.device else None)
+    merchant_id = await tx_repo.get_or_create_merchant(payload.merchant_id, payload.merchant_category)
+    # Flat device_id / ip_address aliases fold into device telemetry when
+    # no full device object is supplied.
+    device_data = payload.device.model_dump() if payload.device else None
+    if device_data is None and (payload.device_id or payload.ip_address):
+        device_data = {
+            "fingerprint": payload.device_id or f"ip-{payload.ip_address}",
+            "ip_address": payload.ip_address or "127.0.0.1",
+        }
+    device_id = await tx_repo.get_or_create_device(device_data)
     beneficiary_id = await tx_repo.get_or_create_beneficiary(account.id, payload.beneficiary.model_dump() if payload.beneficiary else None)
+
+    # Account age: caller value wins, otherwise derive from account record.
+    account_age_days = payload.account_age_days
+    if account_age_days is None and account.created_at:
+        account_age_days = max(0, (datetime.utcnow() - account.created_at).days)
 
     # 2. Build initial execution state
     state = {
@@ -55,8 +72,11 @@ async def intercept_transaction(
             "location": payload.location,
             "channel": payload.channel,
             "transaction_type": payload.transaction_type,
-            "device": payload.device.model_dump() if payload.device else {},
+            "merchant_category": payload.merchant_category,
+            "device": payload.device.model_dump() if payload.device else (device_data or {}),
             "beneficiary": payload.beneficiary.model_dump() if payload.beneficiary else {},
+            "account_age_days": account_age_days,
+            "failed_attempts": payload.failed_attempts,
             "reference_number": f"TX-{uuid.uuid4().hex[:12].upper()}"
         },
         "velocity": 1.5,
@@ -74,14 +94,23 @@ async def intercept_transaction(
         {"customer_id": str(tx.account.customer_id) if tx.account else "", "beneficiary_id": str(tx.beneficiary_id) if tx.beneficiary_id else "", "amount": float(tx.amount)}
         for tx in history
     ]
+    # Caller-supplied history augments (never replaces) DB history for AML.
+    if payload.transaction_history:
+        for h in payload.transaction_history:
+            state["history"].append({
+                "customer_id": str(payload.customer_id),
+                "beneficiary_id": h.counterparty or "",
+                "amount": float(h.amount),
+            })
 
     # 3. Trigger LangGraph Workflow Node Pipeline Execution
     try:
         execution_results = await compiled_graph.ainvoke(state)
     except Exception as e:
+        logger.exception("Intercept pipeline crash tx_id=%s", tx_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Governance pipeline runtime crash: {str(e)}"
+            detail="Governance pipeline runtime crash."
         )
 
     # 4. Resolve final verdict and trust score parameters.
@@ -96,6 +125,8 @@ async def intercept_transaction(
         reasons.append("Medium trust score metrics require human-in-the-loop audit.")
 
     trust_score = execution_results.get("trust_score_value", 100)
+    if "trust_score_value" not in execution_results:
+        logger.warning("Pipeline returned no trust_score_value tx_id=%s; defaulting to 100", tx_id)
     explanation_res = execution_results.get("explanation_data", {}) or {}
     if not isinstance(explanation_res, dict):
         explanation_res = {"human_readable": getattr(explanation_res, "human_readable", "Checks completed successfully.")}
@@ -147,10 +178,19 @@ async def intercept_transaction(
         resource_id=str(tx_id),
         metadata={
             "amount": payload.amount,
+            "currency": payload.currency,
+            "merchant_category": payload.merchant_category,
+            "account_age_days": account_age_days,
+            "failed_attempts": payload.failed_attempts,
             "verdict": verdict,
             "trust_score": trust_score,
             "latency_ms": latency_ms
         }
+    )
+    logger.info(
+        "Intercept done tx_id=%s verdict=%s trust=%s latency_ms=%.1f review=%s",
+        tx_id, verdict, trust_score, latency_ms,
+        "yes" if verdict == "under_review" else "no",
     )
 
     # Check review mapping

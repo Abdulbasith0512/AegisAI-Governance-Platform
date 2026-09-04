@@ -56,7 +56,7 @@ class TransactionRepository:
             await self.db.refresh(account)
         return account
 
-    async def get_or_create_merchant(self, merchant_id: Optional[uuid.UUID]) -> Optional[uuid.UUID]:
+    async def get_or_create_merchant(self, merchant_id: Optional[uuid.UUID], category_code: Optional[str] = None) -> Optional[uuid.UUID]:
         if not merchant_id:
             return None
         res = await self.db.execute(select(Merchant).where(Merchant.id == merchant_id))
@@ -66,7 +66,7 @@ class TransactionRepository:
                 id=merchant_id,
                 merchant_code=f"MCH-{merchant_id.hex[:6].upper()}",
                 name="Aegis Merchant Partner",
-                category_code="5999"
+                category_code=category_code or "5999"
             )
             self.db.add(merchant)
             await self.db.commit()

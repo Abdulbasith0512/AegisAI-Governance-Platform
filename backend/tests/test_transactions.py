@@ -1,7 +1,9 @@
 import pytest
 import uuid
 from typing import Dict, Any
+from pydantic import ValidationError
 from app.schemas.transaction import TransactionInterceptRequest
+from agents.supervisor import parse_supervisor_verdict
 from ml.models import fraud_estimator, behavior_estimator, aml_estimator, kyc_estimator
 from app.services.vector_store import AegisVectorStore
 
@@ -26,6 +28,86 @@ def test_transaction_intercept_request_validation() -> None:
     assert req.amount == 250.0
     assert req.currency == "USD"
     assert req.device.fingerprint == "dev_fingerprint_abc"
+
+def test_transaction_intercept_request_full_payload() -> None:
+    """Validates the extended Phase-1 payload with all optional risk signals."""
+    payload = {
+        "transaction_id": str(uuid.uuid4()),
+        "customer_id": str(uuid.uuid4()),
+        "merchant_id": str(uuid.uuid4()),
+        "merchant_category": "5411",
+        "amount": 1250.75,
+        "currency": "EUR",
+        "location": "Berlin, DE",
+        "device_id": "dev-flat-alias-01",
+        "ip_address": "203.0.113.10",
+        "account_age_days": 365,
+        "failed_attempts": 2,
+        "transaction_history": [
+            {"amount": 100.0, "counterparty": "acct-1", "status": "approved"},
+            {"amount": 4900.0, "counterparty": "acct-2", "status": "declined"},
+        ],
+        "channel": "web",
+        "transaction_type": "payment",
+        "device": {
+            "fingerprint": "dev_full_01",
+            "ip_address": "203.0.113.10",
+            "is_emulator": False
+        },
+        "metadata": {"order_id": "ord-123"}
+    }
+
+    req = TransactionInterceptRequest(**payload)
+    assert req.merchant_category == "5411"
+    assert req.device_id == "dev-flat-alias-01"
+    assert req.ip_address == "203.0.113.10"
+    assert req.account_age_days == 365
+    assert req.failed_attempts == 2
+    assert len(req.transaction_history) == 2
+    assert req.transaction_history[0].amount == 100.0
+
+def test_transaction_intercept_request_minimal_payload_defaults() -> None:
+    """New fields are optional: minimal payload still validates with safe defaults."""
+    req = TransactionInterceptRequest(customer_id=uuid.uuid4(), amount=10.0)
+    assert req.merchant_category is None
+    assert req.device_id is None
+    assert req.ip_address is None
+    assert req.account_age_days is None
+    assert req.failed_attempts == 0
+    assert req.transaction_history is None
+    assert req.transaction_id is None  # generated server-side
+
+@pytest.mark.parametrize("payload,field", [
+    ({"customer_id": str(uuid.uuid4()), "amount": -5.0}, "amount"),
+    ({"customer_id": str(uuid.uuid4()), "amount": 0.0}, "amount"),
+    ({"customer_id": str(uuid.uuid4()), "amount": 10.0, "currency": "US"}, "currency"),
+    ({"customer_id": str(uuid.uuid4()), "amount": 10.0, "currency": "DOLLAR"}, "currency"),
+    ({"amount": 10.0}, "customer_id"),
+    ({"customer_id": "not-a-uuid", "amount": 10.0}, "customer_id"),
+    ({"customer_id": str(uuid.uuid4()), "amount": 10.0, "account_age_days": -1}, "account_age_days"),
+    ({"customer_id": str(uuid.uuid4()), "amount": 10.0, "failed_attempts": -2}, "failed_attempts"),
+    ({"customer_id": str(uuid.uuid4()), "amount": 10.0, "transaction_history": [{"counterparty": "x"}]}, "transaction_history"),
+])
+def test_transaction_intercept_request_invalid(payload: Dict[str, Any], field: str) -> None:
+    """Invalid payloads are rejected by Pydantic before any DB or agent work."""
+    with pytest.raises(ValidationError) as exc_info:
+        TransactionInterceptRequest(**payload)
+    assert field in str(exc_info.value).lower() or len(exc_info.value.errors()) > 0
+
+@pytest.mark.parametrize("reasoning,expected", [
+    ("verdict: approved | trust_score: 92 | reasoning: ok", "approved"),
+    ("verdict: declined | trust_score: 20 | reasoning: hard block", "declined"),
+    ("verdict: under_review | trust_score: 68 | reasoning: review", "under_review"),
+    # Prose mentioning "declined" must not flip an approved verdict prefix
+    ("verdict: approved | trust_score: 88 | reasoning: never declined before", "approved"),
+    (None, "approved"),
+    ("", "approved"),
+    ("something unstructured", "approved"),
+])
+def test_parse_supervisor_verdict(reasoning: Any, expected: str) -> None:
+    """Verdict parsing prefers the structured prefix over substring matching."""
+    assert parse_supervisor_verdict({"reasoning": reasoning}) == expected
+    assert parse_supervisor_verdict(type("R", (), {"reasoning": reasoning})()) == expected
 
 def test_real_ml_estimators_predict() -> None:
     """Checks prediction output ranges and probas for scikit-learn models."""
