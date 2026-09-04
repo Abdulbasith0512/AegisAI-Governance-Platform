@@ -21,6 +21,14 @@ from app.services.vector_store import aegis_vector_store
 from app.services.observability import record_transaction_metrics
 from agents.graph import compiled_graph
 from agents.supervisor import parse_supervisor_verdict
+from app.services.event_bus import (
+    DECISION_CREATED,
+    REVIEW_CREATED,
+    TRANSACTION_RECEIVED,
+    bind_transaction,
+    emit_event,
+    unbind_transaction,
+)
 
 router = APIRouter(prefix="/transactions", tags=["Transactions Registry"])
 
@@ -42,6 +50,12 @@ async def intercept_transaction(
 
     tx_id = payload.transaction_id or uuid.uuid4()
     logger.info("Intercept attempt tx_id=%s customer=%s amount=%s %s", tx_id, payload.customer_id, payload.amount, payload.currency)
+    await emit_event(
+        TRANSACTION_RECEIVED,
+        "received",
+        transaction_id=str(tx_id),
+        metadata={"amount": payload.amount, "currency": payload.currency},
+    )
 
     # 1. Resolve customer profile and account dependencies.
     # Strict lookup: unknown customers fail with 404. The repository no
@@ -111,7 +125,9 @@ async def intercept_transaction(
                 "amount": float(h.amount),
             })
 
-    # 3. Trigger LangGraph Workflow Node Pipeline Execution
+    # 3. Trigger LangGraph Workflow Node Pipeline Execution.
+    # Bind the transaction so each agent emits timed execution events.
+    _emit_token = bind_transaction(str(tx_id))
     try:
         execution_results = await compiled_graph.ainvoke(state)
     except Exception as e:
@@ -120,6 +136,8 @@ async def intercept_transaction(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Governance pipeline runtime crash."
         )
+    finally:
+        unbind_transaction(_emit_token)
 
     # 4. Resolve final verdict and trust score parameters.
     # The supervisor emits a structured "verdict: X | ..." reasoning prefix;
@@ -217,6 +235,25 @@ async def intercept_transaction(
             if r.transaction_id == tx_id:
                 review_id = r.id
                 break
+        if review_id is not None:
+            await emit_event(
+                REVIEW_CREATED,
+                "pending",
+                transaction_id=str(tx_id),
+                metadata={"review_id": str(review_id)},
+            )
+
+    await emit_event(
+        DECISION_CREATED,
+        verdict,
+        transaction_id=str(tx_id),
+        metadata={
+            "trust_score": trust_score,
+            "reasons": reasons,
+            "requires_human_review": bool(verdict == "under_review"),
+            "review_id": str(review_id) if review_id else None,
+        },
+    )
 
     return TransactionInterceptResponse(
         transaction_id=tx_id,

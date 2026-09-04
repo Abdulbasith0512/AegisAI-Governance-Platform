@@ -10,8 +10,9 @@ import {
   getTransactionDetail,
   postIntercept,
 } from "@/lib/api";
+import { ConnectionState, TxEvent, TxSubscription, subscribeToTransaction } from "@/lib/txEvents";
 
-type StageState = "done" | "active" | "queued" | "skipped";
+type StageState = "done" | "active" | "queued" | "skipped" | "failed";
 
 interface Stage {
   key: string;
@@ -74,6 +75,77 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
   const [result, setResult] = useState<InterceptResponse | null>(null);
   const [detail, setDetail] = useState<TransactionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [connection, setConnection] = useState<ConnectionState | null>(null);
+  const [liveStages, setLiveStages] = useState<Record<string, { state: StageState; note?: string }>>({});
+  const [liveReviewId, setLiveReviewId] = useState<string | null>(null);
+  const subRef = React.useRef<TxSubscription | null>(null);
+  const resyncRef = React.useRef(false);
+
+  React.useEffect(() => {
+    return () => {
+      subRef.current?.close();
+      subRef.current = null;
+    };
+  }, []);
+
+  const AGENT_STAGE: Record<string, string> = {
+    DeviceAgent: "device",
+    FraudAgent: "fraud",
+    AMLAgent: "aml",
+    PolicyAgent: "policy",
+  };
+
+  function applyEvent(ev: TxEvent) {
+    const meta = (ev.metadata ?? {}) as Record<string, unknown>;
+    switch (ev.event_type) {
+      case "transaction.received":
+        setLiveStages((p) => ({ ...p, received: { state: "done" }, running: { state: "active" } }));
+        break;
+      case "agent.started": {
+        const key = ev.agent ? AGENT_STAGE[ev.agent] : undefined;
+        if (key) setLiveStages((p) => ({ ...p, [key]: { state: "active" } }));
+        break;
+      }
+      case "agent.completed": {
+        const key = ev.agent ? AGENT_STAGE[ev.agent] : undefined;
+        const ms = typeof meta.execution_time_s === "number" ? ` · ${(meta.execution_time_s * 1000).toFixed(1)} ms` : "";
+        if (key) setLiveStages((p) => ({ ...p, [key]: { state: "done", note: `completed${ms}` } }));
+        break;
+      }
+      case "agent.failed": {
+        const key = ev.agent ? AGENT_STAGE[ev.agent] : undefined;
+        const err = typeof meta.error === "string" ? meta.error : "failed";
+        if (key) setLiveStages((p) => ({ ...p, [key]: { state: "failed", note: err } }));
+        break;
+      }
+      case "policy.evaluated": {
+        const failed = Array.isArray(meta.failed_policies) ? (meta.failed_policies as string[]).join(", ") : "";
+        setLiveStages((p) => ({
+          ...p,
+          policy: { state: "done", note: failed ? `violations: ${failed}` : "passed" },
+        }));
+        break;
+      }
+      case "trust.calculated": {
+        const score = typeof meta.trust_score === "number" ? meta.trust_score : null;
+        setLiveStages((p) => ({
+          ...p,
+          trust: score !== null ? { state: "done", note: `${score} / 100` } : { state: "active" },
+        }));
+        break;
+      }
+      case "review.created":
+        if (typeof meta.review_id === "string") setLiveReviewId(meta.review_id);
+        break;
+      case "decision.created":
+        setLiveStages((p) => ({ ...p, completed: { state: "done" } }));
+        subRef.current?.close();
+        subRef.current = null;
+        break;
+      default:
+        break;
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,8 +163,40 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
       return;
     }
     setRunning(true);
+    // Subscribe BEFORE posting so no execution event is missed. The
+    // transaction ID is client-generated (backend accepts it), which lets
+    // the socket attach ahead of the run.
+    const txId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `console-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    subRef.current?.close();
+    setLiveStages({ received: { state: "queued" }, running: { state: "queued" } });
+    setLiveReviewId(null);
+    setConnection(null);
+    resyncRef.current = false;
+    subRef.current = subscribeToTransaction(txId, {
+      onEvent: applyEvent,
+      onConnection: (state) => {
+        setConnection(state);
+        // Heal missed events from the REST source of truth on reconnect
+        if (state === "reconnecting") resyncRef.current = true;
+        if (state === "connected" && resyncRef.current) {
+          resyncRef.current = false;
+          void (async () => {
+            try {
+              setDetail(await getTransactionDetail(txId));
+            } catch {
+              /* detail stays as-is; stages keep last-known state */
+            }
+          })();
+        }
+      },
+      onExhausted: () => setError("Live stream unavailable — result below still comes from the completed request."),
+    });
     try {
       const res = await postIntercept({
+        transaction_id: txId,
         customer_id: customerId.trim(),
         amount: parsedAmount,
         currency,
@@ -130,31 +234,74 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
   }
 
   const predictions: AgentPrediction[] = detail?.predictions ?? [];
-  const stages: Stage[] = !result && !running
+  // Live socket state wins; REST detail enriches rows the socket missed.
+  function stageFor(
+    key: string,
+    fallback: () => { state: StageState; note?: string }
+  ): { state: StageState; note?: string } {
+    return liveStages[key] ?? fallback();
+  }
+  const stages: Stage[] = !result && !running && Object.keys(liveStages).length === 0
     ? []
     : [
-        { key: "received", label: "Received", state: "done", note: result ? result.transaction_id : undefined },
-        { key: "running", label: "Running", state: running ? "active" : "done" },
+        {
+          key: "received",
+          label: "Received",
+          ...stageFor("received", () => ({
+            state: "done" as StageState,
+            note: result ? result.transaction_id : undefined,
+          })),
+        },
+        {
+          key: "running",
+          label: "Running",
+          ...stageFor("running", () => ({ state: (running ? "active" : "done") as StageState })),
+        },
         ...(["device", "fraud", "aml", "policy"] as const).map((m) => {
           const p = predictionFor(predictions, m);
           const label = { device: "Device check", fraud: "Fraud check", aml: "AML check", policy: "Policy check" }[m];
-          if (running || (!p && !detail)) return { key: m, label, state: "queued" as StageState };
-          if (!p) return { key: m, label, state: "skipped" as StageState };
-          return { key: m, label, state: "done" as StageState, note: `conf ${confOf(p)} · ${latencyOf(p)}` };
+          const { state, note } = stageFor(m, () => {
+            if (running || (!p && !detail)) return { state: "queued" as StageState };
+            if (!p) return { state: "skipped" as StageState };
+            return { state: "done" as StageState, note: `conf ${confOf(p)} · ${latencyOf(p)}` };
+          });
+          return { key: m, label, state, note };
         }),
-        detail && detail.trust_score !== null
-          ? { key: "trust", label: "Trust evaluation", state: "done" as StageState, note: `${detail.trust_score} / 100` }
-          : { key: "trust", label: "Trust evaluation", state: (running ? "active" : "queued") as StageState },
-        result && !running
-          ? { key: "completed", label: `Completed · ${result.verdict.replace("_", " ")}`, state: "done" as StageState }
-          : { key: "completed", label: "Completed", state: "queued" as StageState },
+        {
+          key: "trust",
+          label: "Trust evaluation",
+          ...stageFor("trust", () =>
+            detail && detail.trust_score !== null
+              ? { state: "done" as StageState, note: `${detail.trust_score} / 100` }
+              : { state: (running ? "active" : "queued") as StageState }
+          ),
+        },
+        {
+          key: "completed",
+          label: result && !running ? `Completed · ${result.verdict.replace("_", " ")}` : "Completed",
+          ...stageFor("completed", () => ({
+            state: (result && !running ? "done" : "queued") as StageState,
+          })),
+        },
       ];
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
         <div className="text-title">New interception</div>
-        <div className="text-caption">POST /api/v1/transactions/intercept</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {connection && connection !== "connected" && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 999,
+              background: connection === "reconnecting" ? "var(--risk-medium-dim)" : "var(--risk-critical-dim)",
+              color: connection === "reconnecting" ? "var(--risk-medium-text)" : "var(--risk-critical-text)",
+              border: "1px solid var(--border-1)",
+            }}>
+              {connection === "reconnecting" ? "Reconnecting live stream…" : "Live stream offline"}
+            </span>
+          )}
+          <div className="text-caption">POST /api/v1/transactions/intercept</div>
+        </div>
       </div>
       <p className="text-caption" style={{ marginBottom: 14 }}>
         Submit a transaction to the governance pipeline. Verdict, agent results and evidence below come from the backend response.
@@ -229,7 +376,7 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, paddingTop: 3 }}>
                   <div style={{
                     width: 10, height: 10, borderRadius: "50%",
-                    background: s.state === "done" ? "var(--status-success)" : s.state === "active" ? "var(--accent)" : s.state === "skipped" ? "var(--gray-600)" : "var(--surface-4)",
+                    background: s.state === "done" ? "var(--status-success)" : s.state === "active" ? "var(--accent)" : s.state === "failed" ? "var(--risk-critical)" : s.state === "skipped" ? "var(--gray-600)" : "var(--surface-4)",
                     border: "2px solid var(--border-1)",
                   }} />
                   {i < stages.length - 1 && <div style={{ width: 1, flex: 1, minHeight: 14, background: "var(--border-1)", margin: "3px 0" }} />}
@@ -239,6 +386,7 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
                     {s.label}
                     {s.state === "active" && <span style={{ color: "var(--accent)", fontWeight: 500 }}> — running</span>}
                     {s.state === "skipped" && <span style={{ color: "var(--gray-600)", fontWeight: 500 }}> — no result</span>}
+                    {s.state === "failed" && <span style={{ color: "var(--risk-critical-text)", fontWeight: 600 }}> — failed</span>}
                   </div>
                   {s.note && (
                     <div style={{ fontSize: "var(--text-12)", color: "var(--gray-400)", fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>{s.note}</div>
@@ -271,9 +419,9 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
             <div>
               <div style={{ fontSize: 10, color: "var(--gray-600)", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 2 }}>Human review</div>
               <div style={{ fontSize: "var(--text-13)", color: "var(--gray-200)" }}>
-                {result.requires_human_review ? (
+                {(result.requires_human_review || liveReviewId) ? (
                   <>
-                    Pending{result.review_id ? ` · ${result.review_id.slice(0, 8)}` : ""} —{" "}
+                    Pending{result.review_id || liveReviewId ? ` · ${(result.review_id ?? liveReviewId ?? "").slice(0, 8)}` : ""} —{" "}
                     <Link href="/dashboard/reviews" style={{ color: "var(--accent)", textDecoration: "underline" }}>open review queue</Link>
                   </>
                 ) : (

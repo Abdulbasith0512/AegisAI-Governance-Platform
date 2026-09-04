@@ -125,6 +125,18 @@ class SupervisorAgent(BaseGovernanceAgent):
 
         trust_score, weights_config, reasons = self.trust_engine.calculate_score(telemetry)
 
+        try:
+            from app.services.event_bus import emit_event, TRUST_CALCULATED
+
+            await emit_event(
+                TRUST_CALCULATED,
+                "success",
+                agent=self.name,
+                metadata={"trust_score": trust_score, "consensus_ratio": consensus_ratio},
+            )
+        except Exception:
+            pass
+
         # Scale down trust score if safety warning checks are hit (e.g. emulator detected or high fraud risk)
         if dev_conf < 0.50 or fraud_conf < 0.50 or aml_conf < 0.50:
             trust_score = min(trust_score, 70)

@@ -7,7 +7,7 @@ from app.config.loader import settings
 from app.core.logging import setup_logging
 from app.core.exceptions import register_exception_handlers
 from app.api.swagger import customize_swagger
-from app.api import health, version
+from app.api import health, version, ws
 from app.api.v1.endpoints import auth, agents, transactions, compliance, chaos, explainability, users, admin, trust, consensus, reviews, observability, self_healing, copilot, graph, security, workflows, simulation, research, intelligence
 from app.middleware.prompt_firewall import PromptFirewallMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -60,6 +60,7 @@ register_exception_handlers(app)
 # Register Core Infrastructure Endpoints
 app.include_router(health.router)
 app.include_router(version.router)
+app.include_router(ws.router)
 
 # Register Sub-module API Endpoints
 app.include_router(auth.router, prefix="/api/v1")

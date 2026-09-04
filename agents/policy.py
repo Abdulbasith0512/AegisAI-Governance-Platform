@@ -40,6 +40,19 @@ class PolicyAgent(BaseGovernanceAgent):
 
         # Map results to state for downstream consensus & supervisor
         state["policy_simulation"] = res.model_dump()
+
+        failed_ids = [p.policy_id for p in res.policies_checked if p.status == "fail"]
+        try:
+            from app.services.event_bus import emit_event, POLICY_EVALUATED
+
+            await emit_event(
+                POLICY_EVALUATED,
+                res.overall_status,
+                agent=self.name,
+                metadata={"failed_policies": failed_ids, "checked": len(res.policies_checked)},
+            )
+        except Exception:
+            pass
         
         reasons = []
         confidence = 1.00

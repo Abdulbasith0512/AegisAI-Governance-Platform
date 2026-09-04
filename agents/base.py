@@ -42,10 +42,15 @@ class BaseGovernanceAgent(abc.ABC):
     async def run(self, state: Dict[str, Any]) -> AgentResponse:
         """
         Main runner coordinating timing, standard error logging, and retry loops.
+        Emits agent.started / agent.completed / agent.failed execution events
+        (no-op when no transaction is bound to the event bus).
         """
+        from app.services.event_bus import emit_event, AGENT_STARTED, AGENT_COMPLETED, AGENT_FAILED
+
         logs: List[str] = []
         start_time = time.perf_counter()
-        
+
+        await emit_event(AGENT_STARTED, "running", agent=self.name)
         attempt = 0
         while attempt < self.max_retries:
             try:
@@ -58,7 +63,13 @@ class BaseGovernanceAgent(abc.ABC):
                 end_time = time.perf_counter()
                 execution_time = end_time - start_time
                 logs.append("Execution completed successfully.")
-                
+
+                await emit_event(
+                    AGENT_COMPLETED,
+                    "success",
+                    agent=self.name,
+                    metadata={"execution_time_s": round(execution_time, 4)},
+                )
                 return AgentResponse(
                     status="success",
                     agent_name=self.name,
@@ -79,6 +90,12 @@ class BaseGovernanceAgent(abc.ABC):
                     end_time = time.perf_counter()
                     execution_time = end_time - start_time
                     logs.append("Maximum execution retries exceeded. Failing.")
+                    await emit_event(
+                        AGENT_FAILED,
+                        "failed",
+                        agent=self.name,
+                        metadata={"error": str(e), "attempts": attempt},
+                    )
                     return AgentResponse(
                         status="failed",
                         agent_name=self.name,
