@@ -214,6 +214,25 @@ class SupervisorAgent(BaseGovernanceAgent):
         }
         state["supervisor_decision"] = decision
 
+        # Final verdict explanation assembled from structured evidence only.
+        # Answers: decision, why, contributors, risk signals, policies,
+        # review requirement — every sentence cites its evidence source.
+        try:
+            from app.services.explainability import build_decision_explanation
+
+            policy_overall = None
+            policy_sim = state.get("policy_simulation") or {}
+            if isinstance(policy_sim, dict):
+                policy_overall = policy_sim.get("overall_status")
+            state["decision_explanation"] = build_decision_explanation(
+                decision=decision,
+                trust_score=trust_score,
+                policy_status=policy_overall,
+                requires_human_review=bool(verdict == "under_review"),
+            )
+        except Exception as e:
+            logger.warning("Decision explanation build failed: %s", e)
+
         return {
             "confidence_score": float(trust_score / 100),
             "reasoning": (

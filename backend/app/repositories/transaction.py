@@ -346,23 +346,43 @@ class TransactionRepository:
             )
             self.db.add(cv)
 
-        # 5. Save Explanation (Linked to Supervisor/Explainability Prediction)
+        # 5. Save Explanation (Linked to Supervisor/Explainability Prediction).
+        # The supervisor's decision bundle (built purely from structured
+        # evidence) takes precedence for the human summary; the trace
+        # bundle fills timeline/graph/attribution columns.
         explain_pred_id = prediction_map.get("explainability-agent")
         explain_data = state.get("explanation_data")
+        decision_expl = state.get("decision_explanation") or {}
         if explain_pred_id and explain_data:
+            machine = dict(explain_data["machine_readable"])
+            if decision_expl:
+                machine["decision"] = {
+                    "summary": decision_expl.get("summary"),
+                    "contributing_factors": decision_expl.get("contributing_factors", []),
+                    "policy_evidence": decision_expl.get("policy_evidence", {}),
+                    "agent_evidence": decision_expl.get("agent_evidence", []),
+                    "confidence": decision_expl.get("confidence"),
+                    "generated_at": decision_expl.get("generated_at"),
+                }
             exp = Explanation(
                 id=uuid.uuid4(),
                 prediction_id=explain_pred_id,
-                human_readable=explain_data["human_readable"],
-                machine_readable=explain_data["machine_readable"],
+                human_readable=decision_expl.get("summary") if decision_expl.get("summary") else explain_data["human_readable"],
+                machine_readable=machine,
                 decision_timeline=explain_data["decision_timeline"],
                 evidence_graph=explain_data["evidence_graph"],
                 feature_importance=explain_data["feature_importance"],
-                confidence_reasoning=explain_data["confidence_reasoning"],
+                confidence_reasoning=(
+                    f"Decision confidence {decision_expl.get('confidence')} "
+                    f"(generated {decision_expl.get('generated_at')}). "
+                    + str(explain_data["confidence_reasoning"])
+                    if decision_expl.get("confidence") is not None
+                    else explain_data["confidence_reasoning"]
+                ),
                 supporting_policies=explain_data["supporting_policies"],
                 contributing_agents=explain_data["contributing_agents"],
                 explainability_score=explain_data["explainability_score"],
-                explanation_vector=explain_data["explanation_vector"]
+                explanation_vector=explain_data.get("explanation_vector")
             )
             self.db.add(exp)
 

@@ -160,10 +160,22 @@ async def intercept_transaction(
             detail="Governance pipeline returned no trust score."
         )
     trust_score = execution_results["trust_score_value"]
+    # Prefer the supervisor's evidence-grounded decision summary; the
+    # trace bundle is the fallback. Both originate from real pipeline
+    # outputs — never fabricated prose.
+    decision_expl = execution_results.get("decision_explanation") or {}
     explanation_res = execution_results.get("explanation_data", {}) or {}
     if not isinstance(explanation_res, dict):
         explanation_res = {"human_readable": getattr(explanation_res, "human_readable", "Checks completed successfully.")}
-    human_explanation = explanation_res.get("human_readable", "Checks completed successfully.")
+    human_explanation = decision_expl.get("summary") or explanation_res.get("human_readable", "Checks completed successfully.")
+    # Real embedding of the served summary via the canonical generator,
+    # so the persisted vector matches the indexed one (column nullable;
+    # failures leave it NULL rather than a constant vector).
+    try:
+        explanation_res["explanation_vector"] = aegis_vector_store.generate_embedding(human_explanation)
+    except Exception as e:
+        logger.warning("Explanation embedding failed tx_id=%s: %s", tx_id, e)
+        explanation_res["explanation_vector"] = None
 
     # 5. Persist Transaction record & multi-agent outcomes.
     # Reuse the state's reference number so the persisted row matches

@@ -14,44 +14,87 @@ class ExplainabilityAgent(BaseGovernanceAgent):
 
     async def _execute(self, state: Dict[str, Any], logs: List[str]) -> Dict[str, Any]:
         logs.append("Synthesizing decision explainability profiles...")
-        
-        fraud_result = state.get("fraud_result")
-        aml_result = state.get("aml_result")
-        device_result = state.get("device_result")
-        kyc_result = state.get("kyc_result")
-        policy_result = state.get("policy_result")
 
-        # Gathers logs and warnings
+        upstream = [
+            ("DeviceAgent", state.get("device_result")),
+            ("KYCAgent", state.get("kyc_result")),
+            ("FraudAgent", state.get("fraud_result")),
+            ("AMLAgent", state.get("aml_result")),
+            ("PolicyAgent", state.get("policy_result")),
+        ]
+
+        def _get(res: Any, key: str, default: Any = None) -> Any:
+            if res is None:
+                return default
+            if isinstance(res, dict):
+                return res.get(key, default)
+            return getattr(res, key, default)
+
+        # Gathers logs and warnings from real upstream confidences
         warnings = []
-        if fraud_result and getattr(fraud_result, "confidence_score", 1.0) < 0.60:
-            warnings.append(f"Suspicious transaction behavior or fraud risk flagged.")
-        if aml_result and getattr(aml_result, "confidence_score", 1.0) < 0.60:
-            warnings.append(f"AML layering/smurfing graph loop indices flagged.")
-        if device_result and getattr(device_result, "confidence_score", 1.0) < 0.60:
-            warnings.append(f"Emulator terminal profile signature matched.")
-        if kyc_result and getattr(kyc_result, "confidence_score", 1.0) < 0.60:
-            warnings.append(f"KYC status mismatch or Pep watchlist registration matched.")
-        if policy_result and getattr(policy_result, "confidence_score", 1.0) < 1.00:
-            warnings.append(f"Regulatory currency or volume thresholds breached.")
+        if fraud_result := state.get("fraud_result"):
+            if (_get(fraud_result, "confidence_score", 1.0) or 1.0) < 0.60:
+                warnings.append("Suspicious transaction behavior or fraud risk flagged.")
+        if aml_result := state.get("aml_result"):
+            if (_get(aml_result, "confidence_score", 1.0) or 1.0) < 0.60:
+                warnings.append("AML layering/smurfing graph loop indices flagged.")
+        if device_result := state.get("device_result"):
+            if (_get(device_result, "confidence_score", 1.0) or 1.0) < 0.60:
+                warnings.append("Emulator terminal profile signature matched.")
+        if kyc_result := state.get("kyc_result"):
+            if (_get(kyc_result, "confidence_score", 1.0) or 1.0) < 0.60:
+                warnings.append("KYC status mismatch or Pep watchlist registration matched.")
+        if policy_result := state.get("policy_result"):
+            if (_get(policy_result, "confidence_score", 1.0) or 1.0) < 1.00:
+                warnings.append("Regulatory currency or volume thresholds breached.")
 
-        # Compile traces
+        # Structured per-agent evidence with MEASURED durations (missing
+        # results are marked skipped, never filled with canned timings).
+        agents_trace = []
+        for name, res in upstream:
+            if res is None:
+                agents_trace.append({"name": name, "status": "skipped", "execution_time_ms": 0.0})
+                continue
+            agents_trace.append({
+                "name": _get(res, "agent_name", name) or name,
+                "status": _get(res, "status", "failed"),
+                "confidence": _get(res, "confidence_score", 0.0),
+                "execution_time_ms": round(float(_get(res, "execution_time", 0.0) or 0.0) * 1000, 2),
+                "evidence": _get(res, "evidence", {}) or {},
+            })
+
+        # Entity nodes + real policy outcomes from the policy simulation.
+        tx_data = state.get("transaction", {}) or {}
+        entities = [
+            {"id": "source_account", "type": "account", "label": "Source account", "status": "active"},
+            {
+                "id": "device_terminal", "type": "device", "label": "Client device",
+                "status": "risk" if any("emulator" in w.lower() for w in warnings) else "passed",
+            },
+        ]
+        policies_checked: List[Dict[str, Any]] = []
+        policy_sim = state.get("policy_simulation") or {}
+        for policy in policy_sim.get("policies_checked", []) or []:
+            if not isinstance(policy, dict):
+                continue
+            status = str(policy.get("status", "unknown"))
+            policies_checked.append({
+                "policy_id": str(policy.get("policy_id", "unknown")),
+                "name": str(policy.get("name", policy.get("policy_id", "unknown"))),
+                "status": status,
+            })
+            entities.append({
+                "id": str(policy.get("policy_id", "policy")),
+                "type": "policy",
+                "label": str(policy.get("name", policy.get("policy_id", "policy"))),
+                "status": "failed" if status == "fail" else "passed",
+            })
+
         agent_traces = {
             "warnings": warnings,
-            "timeline": [
-                {"event": "Transaction Ingested", "duration_ms": 1.5, "status": "success"},
-                {"event": "Device Evaluation Complete", "duration_ms": 12.4, "status": "success" if device_result else "skipped"},
-                {"event": "KYC Identity Check Complete", "duration_ms": 14.8, "status": "success" if kyc_result else "skipped"},
-                {"event": "Model Classifier Prediction Resolved", "duration_ms": 42.1, "status": "success" if fraud_result else "skipped"},
-                {"event": "Compliance Policies Verified", "duration_ms": 8.2, "status": "success" if policy_result else "skipped"},
-                {"event": "Final Decision Output Rendered", "duration_ms": 1.0, "status": "success"}
-            ],
-            "feature_importance": {
-                "amount_value": 0.35 if (warnings and any("volume" in w.lower() for w in warnings)) else 0.05,
-                "device_is_emulator": 0.65 if any("emulator" in w.lower() for w in warnings) else 0.05,
-                "ip_velocity": 0.12,
-                "kyc_risk_tier": 0.45 if any("kyc" in w.lower() for w in warnings) else 0.02,
-                "aml_loops": 0.55 if any("aml" in w.lower() for w in warnings) else 0.03,
-            }
+            "agents": agents_trace,
+            "entities": entities,
+            "policies": policies_checked,
         }
 
         prediction_id = state.get("prediction_id", uuid.uuid4())
