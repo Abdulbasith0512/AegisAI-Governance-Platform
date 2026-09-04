@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { API_BASE_URL, apiUrl } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/api";
 
 interface HardwareMetric {
   label: string;
