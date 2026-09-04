@@ -1,0 +1,24 @@
+{
+  "model_version": "behavior-if-v1.0.0",
+  "estimator": "IsolationForest(n=200,contamination=0.12)+StandardScaler",
+  "features": [
+    "amount_zscore",
+    "hour_rarity",
+    "new_merchant",
+    "new_device",
+    "mcc_deviation",
+    "velocity_norm",
+    "failed_attempts_norm"
+  ],
+  "seed": 7,
+  "data_file": "synthetic_behavior_dev.csv",
+  "data_sha": "597e6b1902c55a89",
+  "artifact_sha": "db4159685d6cc4a9",
+  "metrics": {
+    "n_rows": 4000,
+    "n_anomalies": 477,
+    "cv_roc_auc": 0.9994
+  },
+  "synthetic_only": true,
+  "disclaimer": "Trained exclusively on synthetic development data. Makes NO claim about real-world accuracy. Baseline only."
+}

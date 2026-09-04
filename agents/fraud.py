@@ -3,7 +3,7 @@ import statistics
 import time
 from agents.base import BaseGovernanceAgent
 from ml.fraud_service import fraud_service
-from ml.models import behavior_estimator
+from ml.behavior_service import behavior_service
 
 # Merchant category codes treated as elevated-risk for cash-out /
 # structuring typologies. Documented heuristic input to the model vector,
@@ -95,14 +95,39 @@ class FraudAgent(BaseGovernanceAgent):
         if result["evidence"]["imputed"]:
             logs.append(f"Imputed signals: {', '.join(result['evidence']['imputed'])}")
 
-        # 2. Behavior anomaly second opinion (Isolation Forest, unchanged)
-        behavior_features = {
+        # 2. Behavioral second opinion: per-customer anomaly analysis over
+        # real history (DB transactions + caller-supplied history). Thin
+        # history yields a neutral, low-confidence result — never invented.
+        history_rows = [
+            {
+                "amount": h.get("amount", 0.0),
+                "timestamp": h.get("timestamp"),
+                "counterparty": h.get("beneficiary_id") or h.get("counterparty"),
+                "device_fingerprint": h.get("device_fingerprint"),
+                "merchant_category_risk": mcc_risk_score(
+                    h.get("merchant_category")
+                ) if h.get("merchant_category") is not None else 0.3,
+            }
+            for h in history
+            if isinstance(h, dict)
+        ]
+        device_profile = tx_data.get("device", {}) or {}
+        behavior_current = {
             "amount": amount,
-            "velocity": float(state.get("velocity", 1.0)),
-            "location_distance": float(state.get("location_distance", 0.0)),
+            "timestamp": tx_data.get("timestamp"),
+            "counterparty": (tx_data.get("beneficiary", {}) or {}).get("beneficiary_account_number"),
+            "device_fingerprint": device_profile.get("fingerprint") if isinstance(device_profile, dict) else None,
+            "merchant_category_risk": mcc_risk_score(tx_data.get("merchant_category")),
+            "velocity_1h": float(state.get("velocity", 1.0)),
+            "failed_attempts": int(tx_data.get("failed_attempts", 0) or 0),
         }
-        behavior_prob = behavior_estimator.predict_proba(behavior_features)
-        logs.append(f"Behavior Anomaly Classifier score: {behavior_prob:.4f}")
+        behavior_out = behavior_service.analyze(behavior_current, history_rows)
+        behavior_prob = float(behavior_out["anomaly_score"])
+        logs.append(
+            f"Behavior anomaly {behavior_out['model_version']}: "
+            f"anomalous={behavior_out['is_anomalous']} score={behavior_prob:.4f} "
+            f"(baseline_n={behavior_out['evidence'].get('baseline_n', 0)})"
+        )
 
         # Save metrics back into the state for explainability attributions
         state["fraud_prob"] = fraud_prob
@@ -112,7 +137,11 @@ class FraudAgent(BaseGovernanceAgent):
         flags = [f"fraud:{t['feature']}" for t in result["triggered_features"]]
         if is_emulator:
             flags.append("emulator_trigger")
-        behavior_disagrees = bool((behavior_prob >= 0.5) != (fraud_prob >= 0.5))
+        if behavior_out["is_anomalous"]:
+            flags.append("behavior_anomaly")
+            for d in behavior_out["evidence"].get("drivers", []):
+                flags.append(f"behavior:{d}")
+        behavior_disagrees = bool(behavior_out["is_anomalous"] != (fraud_prob >= 0.5))
         if behavior_disagrees:
             flags.append("behavior_disagreement")
             logs.append("Note: behavior model disagrees with fraud baseline.")
@@ -123,7 +152,10 @@ class FraudAgent(BaseGovernanceAgent):
             "evidence": {
                 "fraud_probability": fraud_prob,
                 "triggered_features": result["triggered_features"],
-                "behavior_prob": float(behavior_prob),
+                "behavior_prob": behavior_prob,
+                "behavior_anomaly": behavior_out["is_anomalous"],
+                "behavior_drivers": behavior_out["evidence"].get("drivers", []),
+                "behavior_model_version": behavior_out["model_version"],
                 "behavior_disagreement": behavior_disagrees,
                 "auxiliary_agrees": result["evidence"]["auxiliary_agrees"],
                 "imputed": result["evidence"]["imputed"],
