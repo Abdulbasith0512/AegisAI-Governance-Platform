@@ -83,6 +83,28 @@ export interface ReviewQueueItem {
   is_sla_breached: boolean;
 }
 
+export interface AuditEvent {
+  id: string;
+  transaction_id: string | null;
+  event_type: string;
+  actor: string | null;
+  timestamp: string;
+  payload: Record<string, unknown> | null;
+  ledger_hash: string;
+}
+
+export interface AuditHistory {
+  transaction_id: string;
+  events: AuditEvent[];
+}
+
+export interface AuditVerify {
+  transaction_id: string;
+  valid: boolean;
+  checked: number;
+  broken_at: string | null;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -130,4 +152,14 @@ export async function getTransactionsHistory(limit = 50): Promise<TransactionDet
 export async function getReviewQueue(): Promise<ReviewQueueItem[]> {
   const res = await fetch(apiUrl("/api/v1/reviews/queue"));
   return handle<ReviewQueueItem[]>(res, "Load review queue");
+}
+
+export async function getAuditHistory(txId: string): Promise<AuditHistory> {
+  const res = await fetch(apiUrl(`/api/v1/audit/transaction/${txId}`));
+  return handle<AuditHistory>(res, "Load audit history");
+}
+
+export async function verifyAuditChain(txId: string): Promise<AuditVerify> {
+  const res = await fetch(apiUrl(`/api/v1/audit/transaction/${txId}/verify`));
+  return handle<AuditVerify>(res, "Verify audit chain");
 }

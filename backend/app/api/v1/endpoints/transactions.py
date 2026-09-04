@@ -34,6 +34,39 @@ router = APIRouter(prefix="/transactions", tags=["Transactions Registry"])
 
 logger = logging.getLogger("aegisai.api.transactions")
 
+_AGENT_RESULT_KEYS = (
+    "device_result", "kyc_result", "fraud_result", "aml_result",
+    "policy_result", "explainability_result", "supervisor_result",
+)
+
+
+def _summarize_agent_results(execution_results: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Compact per-agent outcome table for the audit ledger.
+
+    Reads the same AgentResponse-or-dict shapes the pipeline produces;
+    missing agents are recorded as such, never invented.
+    """
+    summary = []
+    for key in _AGENT_RESULT_KEYS:
+        res = execution_results.get(key)
+        if res is None:
+            summary.append({"agent": key, "status": "missing"})
+            continue
+
+        def _get(field: str, default: Any = None) -> Any:
+            if isinstance(res, dict):
+                return res.get(field, default)
+            return getattr(res, field, default)
+
+        summary.append({
+            "agent": _get("agent_name", key) or key,
+            "status": _get("status", "unknown"),
+            "confidence": _get("confidence_score"),
+            "risk_score": _get("risk_score"),
+            "execution_time_s": _get("execution_time"),
+        })
+    return summary
+
 @router.post("/intercept", response_model=TransactionInterceptResponse, status_code=status.HTTP_201_CREATED)
 async def intercept_transaction(
     payload: TransactionInterceptRequest,
@@ -216,10 +249,12 @@ async def intercept_transaction(
         consensus_score=execution_results.get("consensus_ratio", 1.0)
     )
 
-    # 8. Cryptographic log entry append
+    # 8. Append the discrete lifecycle events to the immutable ledger.
+    # One row per stage (received was logged pre-graph); the hash chain
+    # links them in execution order. History is append-only by design.
     await audit_repo.log_action(
-        action_type="intercept_transaction",
-        description=f"Transaction {tx_id} processed through AegisAI. Verdict: {verdict}",
+        action_type="transaction.received",
+        description=f"Transaction {tx_id} received for governance evaluation.",
         resource_id=str(tx_id),
         metadata={
             "amount": payload.amount,
@@ -227,10 +262,57 @@ async def intercept_transaction(
             "merchant_category": payload.merchant_category,
             "account_age_days": account_age_days,
             "failed_attempts": payload.failed_attempts,
+        },
+    )
+    await audit_repo.log_action(
+        action_type="agents.executed",
+        description=f"Governance agents executed for transaction {tx_id}.",
+        resource_id=str(tx_id),
+        metadata={"agents": _summarize_agent_results(execution_results)},
+    )
+    policy_sim = execution_results.get("policy_simulation") or {}
+    failed_policies = [
+        p.get("policy_id")
+        for p in (policy_sim.get("policies_checked") or [])
+        if isinstance(p, dict) and p.get("status") == "fail"
+    ]
+    await audit_repo.log_action(
+        action_type="policy.evaluated",
+        description=f"Policy evaluation {policy_sim.get('overall_status', 'unknown')} for transaction {tx_id}.",
+        resource_id=str(tx_id),
+        metadata={
+            "overall_status": policy_sim.get("overall_status", "unknown"),
+            "failed_policies": failed_policies,
+        },
+    )
+    await audit_repo.log_action(
+        action_type="trust.calculated",
+        description=f"Trust score {trust_score} calculated for transaction {tx_id}.",
+        resource_id=str(tx_id),
+        metadata={
+            "trust_score": trust_score,
+            "consensus_ratio": execution_results.get("consensus_ratio", 1.0),
+        },
+    )
+    await audit_repo.log_action(
+        action_type="decision.created",
+        description=f"Transaction {tx_id} processed through AegisAI. Verdict: {verdict}",
+        resource_id=str(tx_id),
+        metadata={
             "verdict": verdict,
             "trust_score": trust_score,
-            "latency_ms": latency_ms
-        }
+            "reasons": reasons,
+            "latency_ms": latency_ms,
+        },
+    )
+    await audit_repo.log_action(
+        action_type="explanation.generated",
+        description=f"Decision explanation generated for transaction {tx_id}.",
+        resource_id=str(tx_id),
+        metadata={
+            "chars": len(human_explanation or ""),
+            "has_shap": bool((explanation_res.get("feature_importance") if isinstance(explanation_res, dict) else None)),
+        },
     )
     logger.info(
         "Intercept done tx_id=%s verdict=%s trust=%s latency_ms=%.1f review=%s",
@@ -248,6 +330,12 @@ async def intercept_transaction(
                 review_id = r.id
                 break
         if review_id is not None:
+            await audit_repo.log_action(
+                action_type="review.created",
+                description=f"Human review {review_id} opened for transaction {tx_id}.",
+                resource_id=str(tx_id),
+                metadata={"review_id": str(review_id)},
+            )
             await emit_event(
                 REVIEW_CREATED,
                 "pending",

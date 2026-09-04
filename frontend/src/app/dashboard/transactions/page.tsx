@@ -12,8 +12,8 @@ import {
 import type { ColumnDef } from '@/components/ui/DataTable';
 import type { Transaction, RiskLevel, TxStatus } from '@/lib/mockData';
 import InterceptConsole from './intercept-console';
-import { ApiError, getReviewQueue, getTransactionDetail, getTransactionsHistory } from "@/lib/api";
-import type { ReviewQueueItem, TransactionDetail } from "@/lib/api";
+import { ApiError, getAuditHistory, getReviewQueue, getTransactionDetail, getTransactionsHistory, verifyAuditChain } from "@/lib/api";
+import type { AuditEvent, AuditVerify, ReviewQueueItem, TransactionDetail } from "@/lib/api";
 
 // Amount histogram data
 function buildAmountHistogram(txs: Transaction[]) {
@@ -255,6 +255,8 @@ export default function Transactions() {
 function TxDetail({ tx }: { tx: Transaction }) {
   const [details, setDetails] = useState<TransactionDetail | null>(null);
   const [review, setReview] = useState<ReviewQueueItem | null>(null);
+  const [audit, setAudit] = useState<AuditEvent[]>([]);
+  const [auditVerify, setAuditVerify] = useState<AuditVerify | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -277,6 +279,18 @@ function TxDetail({ tx }: { tx: Transaction }) {
         setReview(queue.find((r) => r.transaction_id === tx.id) ?? null);
       } catch {
         setReview(null);
+      }
+      // Immutable ledger slice + chain verdict (best-effort enrichment)
+      try {
+        const [history, verify] = await Promise.all([
+          getAuditHistory(tx.id),
+          verifyAuditChain(tx.id),
+        ]);
+        setAudit(history.events);
+        setAuditVerify(verify);
+      } catch {
+        setAudit([]);
+        setAuditVerify(null);
       }
     }
     void loadDetails();
@@ -435,6 +449,45 @@ function TxDetail({ tx }: { tx: Transaction }) {
               ? 'Flagged for review — see the Human Reviews queue for the live case.'
               : 'No human review required for this transaction.'}
           </div>
+        )}
+      </div>
+
+      {/* Immutable audit trail */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div className="text-label">Audit Trail</div>
+          {auditVerify && (
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+              background: auditVerify.valid ? 'var(--risk-safe-dim)' : 'var(--risk-critical-dim)',
+              color: auditVerify.valid ? 'var(--risk-safe-text)' : 'var(--risk-critical-text)',
+              border: '1px solid var(--border-1)',
+            }}>
+              {auditVerify.valid ? `Chain verified · ${auditVerify.checked}` : 'Chain broken'}
+            </span>
+          )}
+        </div>
+        {audit.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {audit.map((evt, i) => (
+              <div key={evt.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, paddingTop: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--gray-500)', flexShrink: 0 }} />
+                  {i < audit.length - 1 && (
+                    <div style={{ width: 1, flex: 1, minHeight: 16, background: 'var(--border-1)', margin: '3px 0' }} />
+                  )}
+                </div>
+                <div style={{ paddingBottom: 8, minWidth: 0 }}>
+                  <div style={{ fontSize: 'var(--text-13)', color: 'var(--gray-200)', fontFamily: 'var(--font-mono)' }}>{evt.event_type}</div>
+                  <div style={{ fontSize: 'var(--text-11)', color: 'var(--gray-500)' }}>
+                    {new Date(evt.timestamp).toLocaleString()} · {evt.actor ?? 'system'} · #{evt.ledger_hash.slice(0, 8)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-caption">No ledger events recorded for this transaction yet.</div>
         )}
       </div>
     </div>

@@ -138,26 +138,15 @@ class RegulatoryCopilotService:
             )
 
         # Calculate dynamic metrics for report compilation
-        import hashlib
         import json
         from sqlalchemy import func
+        from app.repositories.audit import verify_ledger_chain
 
         chain_intact = True
         try:
             res_audit = await self.db.execute(select(AuditLog).order_by(AuditLog.created_at.asc()))
             audit_logs = res_audit.scalars().all()
-            prev_hash = "0" * 64
-            for log in audit_logs:
-                meta_str = json.dumps(log.audit_metadata, sort_keys=True) if log.audit_metadata else "{}"
-                payload_data = (
-                    f"{log.actor_id or ''}|{log.action_type}|{log.description}|{log.resource_id or ''}|"
-                    f"{meta_str}|{prev_hash}"
-                )
-                expected_hash = hashlib.sha256(payload_data.encode("utf-8")).hexdigest()
-                if log.ledger_hash != expected_hash:
-                    chain_intact = False
-                    break
-                prev_hash = log.ledger_hash
+            chain_intact, _, _ = verify_ledger_chain(audit_logs)
         except Exception:
             chain_intact = False
 
