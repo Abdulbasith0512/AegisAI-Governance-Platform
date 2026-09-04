@@ -45,26 +45,23 @@ export function ArchitectureFlow() {
   const [activeStep, setActiveStep] = useState<number>(2);
 
   return (
-    <section id="architecture" className="py-20 md:py-28 relative border-t border-[#173049]/60 bg-[#070b12]">
+    <section id="architecture" className="py-20 md:py-28 relative border-t border-white/[0.08] bg-[#0A0A0B]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[4px] bg-[#1AA0A8]/10 border border-[#1AA0A8]/30 text-[#1AA0A8] font-mono text-[11px] uppercase tracking-wider mb-4">
-            <span>Execution Pipeline</span>
-          </div>
-          <h2 
-            className="text-3xl sm:text-4xl font-normal text-white tracking-tight mb-4"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            How AegisAI Governs Autonomous Agent Actions
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-4">
+            Execution pipeline
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-[-0.02em] mb-4 font-sans">
+            How AegisAI governs agent actions
           </h2>
-          <p className="text-sm sm:text-base text-[#94A3B8] leading-relaxed font-sans">
-            Every transaction or decision passes through a multi-stage zero-trust validation pipeline before final execution.
+          <p className="text-[15px] text-zinc-400 leading-relaxed font-sans">
+            Every transaction passes through a multi-stage zero-trust validation pipeline before execution.
           </p>
         </div>
 
         {/* Stepper Pipeline */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-5">
           {STEPS.map((s, idx) => {
             const Icon = s.icon;
             const isActive = idx === activeStep;
@@ -72,54 +69,55 @@ export function ArchitectureFlow() {
               <button
                 key={idx}
                 onClick={() => setActiveStep(idx)}
-                className={`p-4 rounded-[4px] border text-left transition-all duration-200 relative ${
+                className={`p-4 rounded-xl border text-left transition-colors duration-150 ${
                   isActive
-                    ? "bg-[#173049] border-[#1AA0A8] shadow-[0_0_20px_rgba(26,160,168,0.25)] text-white"
-                    : "bg-[#0d131f]/70 border-[#173049] hover:border-[#1AA0A8]/40 hover:bg-[#173049]/40 text-slate-400"
+                    ? "bg-white/[0.05] border-white/20 text-white"
+                    : "bg-white/[0.02] border-white/[0.08] hover:border-white/20 hover:bg-white/[0.04] text-zinc-400"
                 }`}
+                style={isActive ? { boxShadow: "inset 0 2px 0 #10B981" } : undefined}
               >
                 <div className="flex justify-between items-center mb-3">
-                  <span className={`font-mono text-xs font-bold ${isActive ? "text-[#1AA0A8]" : "text-[#5E7386]"}`}>
-                    STEP {s.step}
+                  <span className={`text-[11px] font-semibold tabular-nums ${isActive ? "text-emerald-300" : "text-zinc-600"}`}>
+                    {s.step}
                   </span>
-                  <Icon size={18} className={isActive ? "text-[#1AA0A8]" : "text-[#5E7386]"} />
+                  <Icon size={17} className={isActive ? "text-emerald-300" : "text-zinc-600"} />
                 </div>
-                <h4 className="text-xs sm:text-sm font-bold text-white mb-1">{s.title}</h4>
-                <div className="text-[10px] font-mono text-slate-400 truncate">{s.tech}</div>
+                <h4 className="text-[13px] font-semibold text-white mb-1 font-sans">{s.title}</h4>
+                <div className="text-[11px] text-zinc-500 truncate font-sans">{s.tech}</div>
               </button>
             );
           })}
         </div>
 
-        {/* Active Step Detail Visualizer with Gradient Shell */}
-        <div className="p-[1px] rounded-[12px] bg-gradient-to-b from-[#1AA0A8]/40 via-[#173049]/30 to-transparent shadow-[0_24px_60px_rgba(23,48,73,0.15)]">
-          <div className="p-6 sm:p-8 rounded-[11px] bg-[#0d131f]/95 backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-6">
+        {/* Active Step Detail */}
+        <div className="rounded-xl border border-white/10 bg-white/[0.02]">
+          <div className="p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="space-y-3 max-w-2xl text-left">
-              <div className="inline-flex items-center gap-2 font-mono text-xs text-[#1AA0A8] bg-[#173049]/60 px-3 py-1 rounded-[4px] border border-[#1AA0A8]/30">
-                <CheckCircle size={14} />
-                <span>ACTIVE STAGE: STEP {STEPS[activeStep].step} — {STEPS[activeStep].tech}</span>
+              <div className="inline-flex items-center gap-2 text-xs text-emerald-300 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-white/10 font-sans font-medium">
+                <CheckCircle size={13} />
+                <span>Stage {STEPS[activeStep].step} · {STEPS[activeStep].tech}</span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-white font-serif">
+              <h3 className="text-xl sm:text-2xl font-bold text-white tracking-[-0.01em] font-sans">
                 {STEPS[activeStep].title}
               </h3>
-              <p className="text-sm text-[#94A3B8] leading-relaxed font-sans">
+              <p className="text-sm text-zinc-400 leading-relaxed font-sans">
                 {STEPS[activeStep].detail}
               </p>
             </div>
 
             <div className="w-full md:w-auto flex-shrink-0">
-              <div className="p-4 rounded-[4px] bg-[#070b12] border border-[#173049] font-mono text-xs space-y-2 text-slate-400 min-w-[280px]">
-                <div className="flex justify-between border-b border-[#173049] pb-1">
-                  <span>LATENCY:</span>
-                  <span className="text-[#1AA0A8]">12.4 ms</span>
+              <div className="p-4 rounded-xl bg-[#0A0A0B] border border-white/10 text-xs space-y-2.5 text-zinc-400 min-w-[260px] font-sans">
+                <div className="flex justify-between border-b border-white/[0.08] pb-2">
+                  <span>Latency</span>
+                  <span className="text-white tabular-nums font-semibold">12.4 ms</span>
                 </div>
-                <div className="flex justify-between border-b border-[#173049] pb-1">
-                  <span>ENFORCEMENT:</span>
-                  <span className="text-white">HARD BLOCK</span>
+                <div className="flex justify-between border-b border-white/[0.08] pb-2">
+                  <span>Enforcement</span>
+                  <span className="text-white font-medium">Hard block</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>INTEGRITY HASH:</span>
-                  <span className="text-[#F6EFDD]">SHA256-VERIFIED</span>
+                  <span>Integrity</span>
+                  <span className="text-emerald-300 font-medium">SHA-256 verified</span>
                 </div>
               </div>
             </div>

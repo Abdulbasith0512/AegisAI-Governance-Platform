@@ -11,31 +11,27 @@ const PILLARS = [
     icon: ShieldCheck,
     title: "Real-Time Trust Scoring",
     description: "Dynamic telemetry engine calculating weighted trust metrics, anomaly indices, and drift scores before settlement.",
-    accent: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
     link: "/trust-dashboard",
-    badge: "Active Telemetry",
+    badge: "Active telemetry",
   },
   {
     icon: Scale,
     title: "Deterministic Policy Engine",
     description: "Hard boundary constraints enforcing RBI Circular G-20, AML thresholds, velocity caps, and dual-signer rules.",
-    accent: "text-indigo-400 bg-indigo-500/10 border-indigo-500/30",
     link: "/policy-dashboard",
-    badge: "Rule Engine",
+    badge: "Rule engine",
   },
   {
     icon: UserCheck,
     title: "Human-in-the-Loop Override",
     description: "Seamless case escalation queue for compliance officers to review, approve, or reject high-value AI transactions.",
-    accent: "text-amber-400 bg-amber-500/10 border-amber-500/30",
     link: "/reviews",
-    badge: "Tier 1/2 Review",
+    badge: "Tier 1 / 2 review",
   },
   {
     icon: Network,
     title: "Multi-Agent Consensus",
     description: "Byzantine fault-tolerant voting architecture requiring cross-verification among isolated guardrail sub-agents.",
-    accent: "text-cyan-400 bg-cyan-500/10 border-cyan-500/30",
     link: "/consensus-dashboard",
     badge: "Byzantine BFT",
   },
@@ -43,68 +39,66 @@ const PILLARS = [
     icon: FileText,
     title: "SHAP & WORM Audit Trail",
     description: "Cryptographically signed Write-Once-Read-Many (WORM) audit ledgers paired with SHAP feature attributions.",
-    accent: "text-purple-400 bg-purple-500/10 border-purple-500/30",
     link: "/explainability",
-    badge: "Immutable Logs",
+    badge: "Immutable logs",
   },
   {
     icon: ZapOff,
     title: "Chaos & Self-Healing",
     description: "Fault injection studio and automated fallback routing to ensure resilience against agent hallucinations or model degradation.",
-    accent: "text-rose-400 bg-rose-500/10 border-rose-500/30",
     link: "/chaos-dashboard",
-    badge: "Fault Injection",
+    badge: "Fault injection",
   },
 ];
 
 export function PillarsGrid() {
   return (
-    <section id="pillars" className="py-20 md:py-28 relative bg-[#090b10]">
+    <section id="pillars" className="py-20 md:py-28 relative border-t border-white/[0.08] bg-[#0A0A0B]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-mono text-[11px] uppercase tracking-wider mb-4">
-            <span>Six Core Pillars</span>
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-4 font-sans">
-            Comprehensive AI Governance Infrastructure
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-4">
+            Platform pillars
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-[-0.02em] mb-4 font-sans">
+            Governance infrastructure, end to end
           </h2>
-          <p className="text-sm sm:text-base text-slate-400 leading-relaxed font-sans font-normal">
+          <p className="text-[15px] text-zinc-400 leading-relaxed font-sans font-normal">
             Designed specifically for regulated financial institutions deploying autonomous AI agents into production.
           </p>
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {PILLARS.map((pillar, idx) => {
             const Icon = pillar.icon;
             return (
               <Link
                 key={idx}
                 href={pillar.link}
-                className="group p-6 rounded-xl border border-slate-800/90 bg-slate-900/30 hover:bg-slate-900/70 hover:border-slate-700 transition-all duration-300 flex flex-col justify-between backdrop-blur-md"
+                className="group p-6 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/20 transition-colors duration-150 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex justify-between items-start mb-5">
-                    <div className={`h-10 w-10 rounded-lg border flex items-center justify-center transition-all duration-300 ${pillar.accent}`}>
-                      <Icon size={20} />
+                    <div className="h-9 w-9 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center text-zinc-200">
+                      <Icon size={18} />
                     </div>
-                    <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-0.5 rounded border border-slate-800 bg-slate-950 text-slate-400">
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.03] text-zinc-500">
                       {pillar.badge}
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors font-sans">
+                  <h3 className="text-[15px] font-semibold text-white mb-1.5 group-hover:text-white transition-colors font-sans tracking-[-0.01em]">
                     {pillar.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-sans mb-6">
+                  <p className="text-[13px] text-zinc-400 leading-relaxed font-sans mb-6">
                     {pillar.description}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-1.5 font-sans text-xs font-medium text-slate-400 group-hover:text-emerald-400 transition-colors pt-4 border-t border-slate-800/80">
-                  <span>Explore Console Module</span>
-                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                <div className="flex items-center gap-1.5 font-sans text-[13px] font-medium text-zinc-500 group-hover:text-zinc-100 transition-colors pt-4 border-t border-white/[0.08]">
+                  <span>Explore module</span>
+                  <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </Link>
             );

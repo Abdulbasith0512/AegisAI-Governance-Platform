@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, FileCheck, Landmark } from "lucide-react";
+import { CheckCircle2, FileCheck } from "lucide-react";
 
 interface Framework {
   id: string;
   name: string;
   authority: string;
   status: string;
-  color: string;
+  statusTone: string;
   requirements: { clause: string; title: string; aegisSolution: string }[];
 }
 
@@ -17,8 +17,8 @@ const FRAMEWORKS: Framework[] = [
     id: "rbi",
     name: "RBI Circular G-20",
     authority: "Reserve Bank of India",
-    status: "100% COMPLIANT",
-    color: "text-[#1AA0A8] border-[#1AA0A8]/40 bg-[#1AA0A8]/10",
+    status: "Compliant",
+    statusTone: "text-emerald-300",
     requirements: [
       {
         clause: "Sec 4.2",
@@ -41,8 +41,8 @@ const FRAMEWORKS: Framework[] = [
     id: "eu",
     name: "EU AI Act (Article 14)",
     authority: "European Parliament & Council",
-    status: "HIGH-RISK AI CERTIFIED",
-    color: "text-[#F6EFDD] border-[#F6EFDD]/40 bg-[#F6EFDD]/10",
+    status: "High-risk certified",
+    statusTone: "text-emerald-300",
     requirements: [
       {
         clause: "Art. 14(1)",
@@ -65,8 +65,8 @@ const FRAMEWORKS: Framework[] = [
     id: "iso",
     name: "ISO / IEC 42001",
     authority: "International Standards Org",
-    status: "AIMS ALIGNED",
-    color: "text-amber-400 border-amber-500/40 bg-amber-950/30",
+    status: "AIMS aligned",
+    statusTone: "text-amber-300",
     requirements: [
       {
         clause: "Clause 6.1",
@@ -86,79 +86,75 @@ export function ComplianceMatrix() {
   const [selectedFramework, setSelectedFramework] = useState<Framework>(FRAMEWORKS[0]);
 
   return (
-    <section id="compliance" className="py-20 md:py-28 relative bg-[#0a0e17]">
+    <section id="compliance" className="py-20 md:py-28 relative border-t border-white/[0.08] bg-[#0A0A0B]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[4px] bg-[#1AA0A8]/10 border border-[#1AA0A8]/30 text-[#1AA0A8] font-mono text-[11px] uppercase tracking-wider mb-4">
-            <Landmark size={13} />
-            <span>Regulatory Standards Matrix</span>
-          </div>
-          <h2 
-            className="text-3xl sm:text-4xl font-normal text-white tracking-tight mb-4"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            Built for Global Financial Regulations
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-4">
+            Regulatory coverage
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-[-0.02em] mb-4 font-sans">
+            Built for global financial regulation
           </h2>
-          <p className="text-sm sm:text-base text-[#94A3B8] leading-relaxed font-sans">
+          <p className="text-[15px] text-zinc-400 leading-relaxed font-sans">
             AegisAI satisfies strict regulatory requirements out of the box with zero custom code required.
           </p>
         </div>
 
         {/* Framework Tabs */}
-        <div className="flex flex-wrap justify-center gap-4 mb-10">
+        <div className="flex flex-wrap justify-center gap-2.5 mb-8">
           {FRAMEWORKS.map((fw) => {
             const isSelected = fw.id === selectedFramework.id;
             return (
               <button
                 key={fw.id}
                 onClick={() => setSelectedFramework(fw)}
-                className={`px-5 py-3 rounded-[4px] border font-mono text-xs font-bold transition-all duration-200 flex items-center gap-2.5 ${
+                className={`px-4 py-2.5 rounded-xl border text-[13px] font-semibold transition-colors duration-150 flex items-center gap-2 ${
                   isSelected
-                    ? "bg-[#173049] border-[#1AA0A8] text-white shadow-[0_0_15px_rgba(26,160,168,0.25)]"
-                    : "bg-[#070b12] border-[#173049] text-slate-400 hover:border-[#1AA0A8]/40 hover:text-white"
+                    ? "bg-white/[0.05] border-white/20 text-white"
+                    : "bg-transparent border-white/[0.08] text-zinc-400 hover:border-white/20 hover:text-white"
                 }`}
               >
                 <span>{fw.name}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-[4px] border ${fw.color}`}>
-                  {fw.status}
+                <span className={`text-xs font-medium ${fw.statusTone}`}>
+                  · {fw.status}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* Requirements Table with Gradient Shell */}
-        <div className="p-[1px] rounded-[12px] bg-gradient-to-b from-[#1AA0A8]/40 via-[#173049]/30 to-transparent shadow-[0_24px_60px_rgba(23,48,73,0.15)]">
-          <div className="p-6 sm:p-8 rounded-[11px] bg-[#0d131f]/95 backdrop-blur-xl">
-            <div className="flex justify-between items-center pb-6 mb-6 border-b border-[#173049]">
+        {/* Requirements Table */}
+        <div className="rounded-xl border border-white/10 bg-white/[0.02]">
+          <div className="p-6 sm:p-8">
+            <div className="flex justify-between items-center pb-5 mb-5 border-b border-white/[0.08]">
               <div>
-                <h3 className="text-xl font-bold text-white font-serif">{selectedFramework.name}</h3>
-                <p className="text-xs font-mono text-[#5E7386]">{selectedFramework.authority}</p>
+                <h3 className="text-lg font-bold text-white tracking-[-0.01em] font-sans">{selectedFramework.name}</h3>
+                <p className="text-[13px] text-zinc-500 font-sans">{selectedFramework.authority}</p>
               </div>
-              <div className={`px-3 py-1 rounded-[4px] border font-mono text-xs font-bold ${selectedFramework.color}`}>
+              <div className={`px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.03] text-xs font-semibold font-sans ${selectedFramework.statusTone}`}>
                 {selectedFramework.status}
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {selectedFramework.requirements.map((req, idx) => (
                 <div
                   key={idx}
-                  className="p-4 rounded-[4px] bg-[#070b12]/80 border border-[#173049] flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 font-mono text-xs text-[#F6EFDD] font-semibold">
-                      <FileCheck size={14} />
-                      <span>CLAUSE {req.clause}: {req.title}</span>
+                    <div className="flex items-center gap-2 text-[13px] text-white font-semibold font-sans">
+                      <FileCheck size={14} className="text-zinc-500 shrink-0" />
+                      <span>{req.clause} · {req.title}</span>
                     </div>
-                    <p className="text-xs text-[#94A3B8] font-sans">
-                      Regulatory Mandate Requirement
+                    <p className="text-[13px] text-zinc-500 font-sans">
+                      Regulatory mandate requirement
                     </p>
                   </div>
 
-                  <div className="md:max-w-md p-3 rounded-[4px] bg-[#1AA0A8]/10 border border-[#1AA0A8]/30 text-xs font-mono text-slate-200 flex items-start gap-2">
-                    <CheckCircle2 size={16} className="text-[#1AA0A8] flex-shrink-0 mt-0.5" />
+                  <div className="md:max-w-md p-3 rounded-lg bg-emerald-500/[0.07] border border-white/10 text-[13px] text-zinc-200 flex items-start gap-2 font-sans">
+                    <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0 mt-0.5" />
                     <span>{req.aegisSolution}</span>
                   </div>
                 </div>

@@ -89,60 +89,53 @@ const MODULES = [
 
 export function ModuleGrid() {
   return (
-    <section id="modules" className="py-20 md:py-28 relative border-t border-[#173049]/60 bg-[#070b12]">
+    <section id="modules" className="py-20 md:py-28 relative border-t border-white/[0.08] bg-[#0A0A0B]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[4px] bg-[#1AA0A8]/10 border border-[#1AA0A8]/30 text-[#1AA0A8] font-mono text-[11px] uppercase tracking-wider mb-4">
-            <span>Operational Console Modules</span>
-          </div>
-          <h2 
-            className="text-3xl sm:text-4xl font-normal text-white tracking-tight mb-4"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            Launch Platform Operations Workspace
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400 mb-4">
+            Console modules
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-[-0.02em] mb-4 font-sans">
+            One workspace, eleven modules
           </h2>
-          <p className="text-sm sm:text-base text-[#94A3B8] leading-relaxed font-sans">
-            Direct access to all 11 specialized dashboards within the AegisAI OS control plane.
+          <p className="text-[15px] text-zinc-400 leading-relaxed font-sans">
+            Direct access to every specialized dashboard in the AegisAI control plane.
           </p>
         </div>
 
-        {/* Grid with Gradient Shell Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {MODULES.map((mod, idx) => {
             const Icon = mod.icon;
             return (
-              <div
+              <Link
                 key={idx}
-                className="p-[1px] rounded-[12px] bg-gradient-to-b from-[#1AA0A8]/25 via-[#173049]/20 to-transparent shadow-[0_12px_40px_rgba(23,48,73,0.1)] group"
+                href={mod.path}
+                className="group p-5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/20 transition-colors duration-150 flex flex-col justify-between"
               >
-                <Link
-                  href={mod.path}
-                  className="h-full p-5 rounded-[11px] bg-[#0d131f]/95 hover:bg-[#131c2d]/95 transition-all duration-200 backdrop-blur-xl flex flex-col justify-between block"
-                >
-                  <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="h-8 w-8 rounded-[4px] bg-[#173049]/60 border border-[#173049] flex items-center justify-center text-slate-300 group-hover:text-[#1AA0A8] group-hover:border-[#1AA0A8]/50 transition-colors">
-                        <Icon size={16} />
-                      </div>
-                      <span className="text-[10px] font-mono text-[#5E7386] uppercase tracking-wider">
-                        {mod.category}
-                      </span>
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="h-9 w-9 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center text-zinc-200">
+                      <Icon size={17} />
                     </div>
-                    <h3 className="text-sm font-bold text-white mb-1.5 group-hover:text-[#1AA0A8] transition-colors">
-                      {mod.name}
-                    </h3>
-                    <p className="text-xs text-[#94A3B8] leading-relaxed font-sans">
-                      {mod.desc}
-                    </p>
+                    <span className="text-[11px] font-medium text-zinc-600 font-sans">
+                      {mod.category}
+                    </span>
                   </div>
+                  <h3 className="text-[15px] font-semibold text-white mb-1 font-sans tracking-[-0.01em]">
+                    {mod.name}
+                  </h3>
+                  <p className="text-[13px] text-zinc-400 leading-relaxed font-sans">
+                    {mod.desc}
+                  </p>
+                </div>
 
-                  <div className="mt-4 pt-3 border-t border-[#173049]/80 flex items-center justify-between font-mono text-[11px] text-slate-400 group-hover:text-[#1AA0A8] transition-colors">
-                    <span>Open Console Module</span>
-                    <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </Link>
-              </div>
+                <div className="mt-4 pt-3.5 border-t border-white/[0.08] flex items-center justify-between text-[13px] font-medium text-zinc-500 group-hover:text-zinc-100 transition-colors font-sans">
+                  <span>Open module</span>
+                  <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </Link>
             );
           })}
         </div>
