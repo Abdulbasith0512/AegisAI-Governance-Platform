@@ -134,8 +134,20 @@ class TransactionRepository:
             await self.db.refresh(device)
         return device.id
 
-    async def get_active_model_version(self, agent_name: str) -> uuid.UUID:
-        """Gets or creates AIAgent & ModelVersion record in db."""
+    async def get_active_model_version(
+        self,
+        agent_name: str,
+        version_string: Optional[str] = None,
+        parameters_hash: Optional[str] = None,
+        accuracy_benchmark: Optional[float] = None,
+        metrics: Optional[Dict[str, Any]] = None,
+    ) -> uuid.UUID:
+        """Gets or creates AIAgent & ModelVersion record in db.
+
+        Optional version metadata lets callers register the real model
+        version (e.g. the fraud artifact version + hash) instead of the
+        generic v1.0.0 row. Defaults preserve legacy behavior.
+        """
         res_a = await self.db.execute(select(AIAgent).where(AIAgent.name == agent_name))
         agent = res_a.scalars().first()
         if not agent:
@@ -155,16 +167,18 @@ class TransactionRepository:
             .order_by(desc(ModelVersion.deployed_at))
         )
         version = res_v.scalars().first()
-        if not version:
+        if version is None or (version_string and version.version_string != version_string):
+            # A new model version supersedes the previous row (kept for
+            # audit history); legacy callers without metadata reuse latest.
             version = ModelVersion(
                 id=uuid.uuid4(),
                 agent_id=agent.id,
-                version_string="v1.0.0",
-                parameters_hash=uuid.uuid4().hex,
-                accuracy_benchmark=0.96,
+                version_string=version_string or (version.version_string if version else "v1.0.0"),
+                parameters_hash=parameters_hash or uuid.uuid4().hex,
+                accuracy_benchmark=accuracy_benchmark if accuracy_benchmark is not None else 0.96,
                 is_active=True,
                 hyperparameters={},
-                metrics={}
+                metrics=metrics or {}
             )
             self.db.add(version)
             await self.db.commit()
@@ -253,7 +267,22 @@ class TransactionRepository:
             if not res:
                 continue
             agent_name = key.replace("_result", "-agent")
-            version_id = await self.get_active_model_version(agent_name)
+            # Fraud predictions link to the real artifact version row
+            # (version string + artifact hash + validation metrics).
+            if agent_name == "fraud-agent":
+                from ml.fraud_service import fraud_service as _fraud_service
+
+                _meta = _fraud_service.metadata
+                version_id = await self.get_active_model_version(
+                    agent_name,
+                    version_string=self._res_get(res, "model", None)
+                    or _meta.get("model_version"),
+                    parameters_hash=_meta.get("artifact_sha"),
+                    accuracy_benchmark=(_meta.get("metrics") or {}).get("val_roc_auc"),
+                    metrics=_meta.get("metrics"),
+                )
+            else:
+                version_id = await self.get_active_model_version(agent_name)
             
             prediction = Prediction(
                 id=uuid.uuid4(),

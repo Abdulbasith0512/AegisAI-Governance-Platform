@@ -1,0 +1,30 @@
+{
+  "model_version": "fraud-gbm-calibrated-v2.0.0",
+  "estimator": "GradientBoostingClassifier(n=150,depth=3,lr=0.08)+CalibratedCV(sigmoid,3-fold)+StandardScaler; auxiliary RandomForest(n=100)",
+  "features": [
+    "amount_log",
+    "velocity_1h",
+    "freq_24h",
+    "merchant_category_risk",
+    "account_age_log",
+    "failed_attempts",
+    "location_deviation_log",
+    "history_amount_zscore"
+  ],
+  "seed": 42,
+  "data_file": "synthetic_fraud_dev.csv",
+  "data_sha": "05ea3e74186408c0",
+  "artifact_sha": "73f3d2919d845ce4",
+  "metrics": {
+    "n_rows": 5000,
+    "n_fraud": 409,
+    "val_precision": 1.0,
+    "val_recall": 1.0,
+    "val_roc_auc": 1.0,
+    "val_avg_precision": 1.0,
+    "cv_roc_auc": 1.0,
+    "cv_avg_precision": 1.0
+  },
+  "synthetic_only": true,
+  "disclaimer": "Trained exclusively on synthetic development data. Makes NO claim about real-world banking fraud accuracy. Baseline for pipeline integration and testing only."
+}
