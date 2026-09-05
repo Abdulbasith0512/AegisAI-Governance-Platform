@@ -67,6 +67,22 @@ class Settings(BaseSettings):
     def normalize_log_level(cls, v: str) -> str:
         return str(v).upper() if isinstance(v, str) else v
 
+    @field_validator(
+        "QDRANT_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "HUGGINGFACE_API_TOKEN",
+        mode="before",
+    )
+    @classmethod
+    def strip_api_key(cls, v: str) -> str:
+        # Pasted keys often carry a trailing newline/space (e.g. from a
+        # dashboard copy button). HTTP headers reject such values, so the
+        # client dies before the request leaves. Whitespace is never a
+        # valid part of these keys — strip it. Passwords are deliberately
+        # excluded (spaces can be legitimate there).
+        return v.strip() if isinstance(v, str) else v
+
     # Relational Database Connection (PostgreSQL)
     DB_HOST: str = Field(default="localhost")
     DB_PORT: int = Field(default=5432)
