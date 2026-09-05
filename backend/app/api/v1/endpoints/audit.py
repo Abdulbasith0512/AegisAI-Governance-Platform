@@ -30,7 +30,7 @@ def _to_event(log: AuditLog) -> AuditEventOut:
     )
 
 
-async def _slice(db: AsyncSession, tx_id: uuid.UUID) -> List[AuditLog]:
+async def _slice(db: AsyncSession, tx_id: uuid.UUID) -> list[AuditLog]:
     result = await db.execute(
         select(AuditLog)
         .where(AuditLog.resource_id == str(tx_id))

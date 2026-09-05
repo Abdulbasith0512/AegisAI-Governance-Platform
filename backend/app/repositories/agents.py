@@ -206,6 +206,11 @@ class AgentMLOpsRepository:
         return list(result.scalars().all())
 
     # --- MLflow Runs ---
+    async def create_mlflow_run(self, schema: MLflowRunCreate) -> MLflowRun:
+        """
+        Persists an MLflow experiment run, ensuring its default project
+        and per-agent experiment rows exist first.
+        """
         # Ensure default project exists
         project_name = "Default Agent Experiments"
         res_p = await self.db.execute(select(ResearchProject).where(ResearchProject.name == project_name))

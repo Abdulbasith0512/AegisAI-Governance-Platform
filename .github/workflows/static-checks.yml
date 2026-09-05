@@ -1,0 +1,21 @@
+name: Static checks (no dependencies)
+
+# Catches deployment-blocking NameError/import bugs that `py_compile`
+# cannot see. Runs on plain stdlib Python — no pip install needed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax check (all Python files)
+        run: python -m compileall -q backend agents ml scripts
+      - name: Undefined-name check (catches NameError before Render does)
+        run: python scripts/check_imports.py
