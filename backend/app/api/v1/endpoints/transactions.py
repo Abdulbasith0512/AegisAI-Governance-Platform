@@ -3,7 +3,7 @@ import time
 import logging
 from datetime import datetime
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, require_permission
 from app.models.users import User
@@ -141,10 +141,12 @@ async def intercept_transaction(
         "prediction_id": uuid.uuid4()
     }
 
-    # Pull prior transactions to pass graph AML cycle evaluation context.
+    # Pull prior transactions for graph AML cycle evaluation context.
+    # Scoped to THIS customer only: global history would leak other
+    # tenants' counterparties into agent context and skew the verdict.
     # list_transactions eager-loads account so tx.account is populated
     # (async lazy-loading would otherwise resolve to None here).
-    history = await tx_repo.list_transactions(limit=10)
+    history = await tx_repo.list_transactions(limit=10, customer_id=payload.customer_id)
     state["history"] = [
         {"customer_id": str(tx.account.customer_id) if tx.account else "", "beneficiary_id": str(tx.beneficiary_id) if tx.beneficiary_id else "", "amount": float(tx.amount)}
         for tx in history
@@ -193,10 +195,24 @@ async def intercept_transaction(
             detail="Governance pipeline returned no trust score."
         )
     trust_score = execution_results["trust_score_value"]
+    # The response contract requires int 0-100; the pipeline may hand back
+    # float/Decimal/str. Coerce and clamp — reject garbage with 500 rather
+    # than tripping response validation after the money row committed.
+    try:
+        trust_score = max(0, min(100, int(float(trust_score))))
+    except (TypeError, ValueError):
+        logger.error("Uncoercible trust_score_value tx_id=%s: %r", tx_id, trust_score)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Governance pipeline returned an invalid trust score."
+        )
     # Prefer the supervisor's evidence-grounded decision summary; the
     # trace bundle is the fallback. Both originate from real pipeline
     # outputs — never fabricated prose.
     decision_expl = execution_results.get("decision_explanation") or {}
+    if not isinstance(decision_expl, dict):
+        logger.warning("decision_explanation not a dict tx_id=%s; ignoring", tx_id)
+        decision_expl = {}
     explanation_res = execution_results.get("explanation_data", {}) or {}
     if not isinstance(explanation_res, dict):
         explanation_res = {"human_readable": getattr(explanation_res, "human_readable", "Checks completed successfully.")}
@@ -228,15 +244,20 @@ async def intercept_transaction(
 
     await tx_repo.persist_pipeline_results(tx_id, execution_results, execution_results)
 
-    # 6. Index Explanation into Qdrant semantic search vector store
+    # 6. Index Explanation into Qdrant semantic search vector store.
+    # Best-effort: the money row is already committed, so a vector outage
+    # must warn — never 500 into a client retry loop that duplicates rows.
     timestamp_str = datetime.utcnow().isoformat()
-    await aegis_vector_store.upsert_explanation(
-        transaction_id=tx_id,
-        explanation_text=human_explanation,
-        verdict=verdict,
-        risk_score=float(1.0 - (trust_score / 100)),
-        timestamp=timestamp_str
-    )
+    try:
+        await aegis_vector_store.upsert_explanation(
+            transaction_id=tx_id,
+            explanation_text=human_explanation,
+            verdict=verdict,
+            risk_score=float(1.0 - (trust_score / 100)),
+            timestamp=timestamp_str
+        )
+    except Exception as e:
+        logger.warning("Qdrant upsert failed tx_id=%s: %s", tx_id, e)
 
     t_end = time.perf_counter()
     latency_ms = (t_end - t_start) * 1000
@@ -271,6 +292,9 @@ async def intercept_transaction(
         metadata={"agents": _summarize_agent_results(execution_results)},
     )
     policy_sim = execution_results.get("policy_simulation") or {}
+    if not isinstance(policy_sim, dict):
+        logger.warning("policy_simulation not a dict tx_id=%s; treating as unknown", tx_id)
+        policy_sim = {}
     failed_policies = [
         p.get("policy_id")
         for p in (policy_sim.get("policies_checked") or [])
@@ -367,7 +391,7 @@ async def intercept_transaction(
 
 @router.get("/history", response_model=List[TransactionOut])
 async def get_transactions_history(
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("read:transactions"))
 ) -> List[TransactionOut]:
@@ -437,10 +461,20 @@ async def get_transaction_predictions(
     tx = await tx_repo.get_transaction_by_id(tx_id)
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    def _agent_name(p: Any) -> str:
+        mv = getattr(p, "model_version", None)
+        agent = getattr(mv, "agent", None) if mv is not None else None
+        return getattr(agent, "name", None) or "unknown-agent"
+
+    def _agent_version(p: Any) -> str:
+        mv = getattr(p, "model_version", None)
+        return getattr(mv, "version_string", None) or "unknown-version"
+
     return [
         {
-            "agent": p.model_version.agent.name,
-            "version": p.model_version.version_string,
+            "agent": _agent_name(p),
+            "version": _agent_version(p),
             "prediction_output": p.prediction_output,
             "confidence_score": p.confidence_score,
             "latency_ms": p.latency_ms
@@ -469,9 +503,11 @@ async def get_transaction_details(
     preds = []
     explanation_text = "No explanation generated."
     for p in tx.predictions:
+        mv = getattr(p, "model_version", None)
+        agent = getattr(mv, "agent", None) if mv is not None else None
         preds.append({
-            "agent": p.model_version.agent.name,
-            "version": p.model_version.version_string,
+            "agent": getattr(agent, "name", None) or "unknown-agent",
+            "version": getattr(mv, "version_string", None) or "unknown-version",
             "output": p.prediction_output,
             "confidence": p.confidence_score,
             "latency": p.latency_ms
@@ -501,14 +537,20 @@ async def replay_transaction(
     orig_id_str = payload.get("transaction_id")
     if not orig_id_str:
         raise HTTPException(status_code=400, detail="Missing transaction_id.")
-    orig_id = uuid.UUID(orig_id_str)
+    try:
+        orig_id = uuid.UUID(str(orig_id_str))
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid transaction_id; must be a UUID.")
     
     tx_repo = TransactionRepository(db)
     orig_tx = await tx_repo.get_transaction_by_id(orig_id)
     if not orig_tx:
         raise HTTPException(status_code=404, detail="Original transaction not found.")
 
-    cust_id = orig_tx.account.customer_id if orig_tx.account else uuid.uuid4()
+    if orig_tx.account is None:
+        logger.error("Replay refused tx %s: original has no account row", orig_id)
+        raise HTTPException(status_code=409, detail="Original transaction has no account; cannot replay.")
+    cust_id = orig_tx.account.customer_id
     
     # Reconstruct transaction request payload.
     # Transaction model stores transaction_type (transfer/payment/...) but no
@@ -558,7 +600,10 @@ async def reprocess_transaction(
     tx_id_str = payload.get("transaction_id")
     if not tx_id_str:
         raise HTTPException(status_code=400, detail="Missing transaction_id.")
-    tx_id = uuid.UUID(tx_id_str)
+    try:
+        tx_id = uuid.UUID(str(tx_id_str))
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid transaction_id; must be a UUID.")
 
     tx_repo = TransactionRepository(db)
     tx = await tx_repo.get_transaction_by_id(tx_id)

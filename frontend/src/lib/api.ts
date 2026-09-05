@@ -126,7 +126,11 @@ async function handle<T>(res: Response, action: string): Promise<T> {
     }
     throw new ApiError(res.status, detail);
   }
-  return (await res.json()) as T;
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new ApiError(res.status, `${action} returned a non-JSON response (${res.status}).`);
+  }
 }
 
 // ── Governance API calls (backend remains the source of truth) ──
@@ -140,7 +144,7 @@ export async function postIntercept(payload: InterceptRequest): Promise<Intercep
 }
 
 export async function getTransactionDetail(txId: string): Promise<TransactionDetail> {
-  const res = await fetch(apiUrl(`/api/v1/transactions/${txId}`));
+  const res = await fetch(apiUrl(`/api/v1/transactions/${encodeURIComponent(txId)}`));
   return handle<TransactionDetail>(res, "Load transaction detail");
 }
 
@@ -155,11 +159,11 @@ export async function getReviewQueue(): Promise<ReviewQueueItem[]> {
 }
 
 export async function getAuditHistory(txId: string): Promise<AuditHistory> {
-  const res = await fetch(apiUrl(`/api/v1/audit/transaction/${txId}`));
+  const res = await fetch(apiUrl(`/api/v1/audit/transaction/${encodeURIComponent(txId)}`));
   return handle<AuditHistory>(res, "Load audit history");
 }
 
 export async function verifyAuditChain(txId: string): Promise<AuditVerify> {
-  const res = await fetch(apiUrl(`/api/v1/audit/transaction/${txId}/verify`));
+  const res = await fetch(apiUrl(`/api/v1/audit/transaction/${encodeURIComponent(txId)}/verify`));
   return handle<AuditVerify>(res, "Verify audit chain");
 }

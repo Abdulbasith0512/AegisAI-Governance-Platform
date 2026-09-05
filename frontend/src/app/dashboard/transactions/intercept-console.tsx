@@ -79,12 +79,21 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
   const [liveStages, setLiveStages] = useState<Record<string, { state: StageState; note?: string }>>({});
   const [liveReviewId, setLiveReviewId] = useState<string | null>(null);
   const subRef = React.useRef<TxSubscription | null>(null);
+  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const resyncRef = React.useRef(false);
+
+  function closeStream() {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    subRef.current?.close();
+    subRef.current = null;
+  }
 
   React.useEffect(() => {
     return () => {
-      subRef.current?.close();
-      subRef.current = null;
+      closeStream();
     };
   }, []);
 
@@ -139,8 +148,17 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
         break;
       case "decision.created":
         setLiveStages((p) => ({ ...p, completed: { state: "done" } }));
-        subRef.current?.close();
-        subRef.current = null;
+        // Grace period for late events (e.g. review.created) before
+        // releasing the socket; resync on reconnect covers the rest.
+        if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = setTimeout(() => {
+    subRef.current?.close();
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+          subRef.current = null;
+        }, 8000);
         break;
       default:
         break;
@@ -160,6 +178,19 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
     }
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError("Amount must be a number greater than zero.");
+      return;
+    }
+    const failedRaw = failedAttempts.trim();
+    if (failedRaw !== "" && !/^\d+$/.test(failedRaw)) {
+      setError("Failed attempts must be a whole number, zero or more.");
+      return;
+    }
+    if (fingerprint.trim() !== "" && ipAddress.trim() === "") {
+      setError("Device IP is required when a fingerprint is provided (and vice versa).");
+      return;
+    }
+    if (ipAddress.trim() !== "" && fingerprint.trim() === "") {
+      setError("Device fingerprint is required when an IP is provided (and vice versa).");
       return;
     }
     setRunning(true);
@@ -185,7 +216,23 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
           resyncRef.current = false;
           void (async () => {
             try {
-              setDetail(await getTransactionDetail(txId));
+              const healed = await getTransactionDetail(txId);
+              setDetail(healed);
+              // Heal missed stage events from REST truth
+              setLiveStages((prev) => {
+                const next = { ...prev };
+                for (const p of healed.predictions ?? []) {
+                  const agent = String(p.agent ?? "").toLowerCase();
+                  const key = ["device", "fraud", "aml", "policy"].find((m) => agent.includes(m));
+                  if (key && !next[key]) {
+                    next[key] = { state: "done", note: "recovered on reconnect" };
+                  }
+                }
+                if (typeof healed.trust_score === "number" && !next.trust) {
+                  next.trust = { state: "done", note: `${healed.trust_score} / 100` };
+                }
+                return next;
+              });
             } catch {
               /* detail stays as-is; stages keep last-known state */
             }
@@ -204,15 +251,18 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
         transaction_type: txType,
         ...(merchantCategory.trim() ? { merchant_category: merchantCategory.trim() } : {}),
         ...(location.trim() ? { location: location.trim() } : {}),
-        ...(fingerprint.trim() || ipAddress.trim()
+        // Only send device signals the operator actually entered, and only
+        // as a complete pair (backend requires fingerprint + ip together).
+        // Empty fields are omitted, never filled with fake values.
+        ...(fingerprint.trim() && ipAddress.trim()
           ? {
               device: {
-                fingerprint: fingerprint.trim() || `console-${Date.now()}`,
-                ip_address: ipAddress.trim() || "127.0.0.1",
+                fingerprint: fingerprint.trim(),
+                ip_address: ipAddress.trim(),
               },
             }
           : {}),
-        failed_attempts: Math.max(0, parseInt(failedAttempts || "0", 10) || 0),
+        failed_attempts: failedRaw === "" ? 0 : parseInt(failedRaw, 10),
       });
       setResult(res);
       onIntercepted?.(res.transaction_id);
@@ -227,6 +277,10 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
         setDetailLoading(false);
       }
     } catch (err) {
+      // The run never started: release the socket (no reconnect loop leaks)
+      // and clear the queued stages so nothing implies execution.
+      closeStream();
+      setLiveStages({});
       setError(err instanceof ApiError ? err.message : "Intercept failed.");
     } finally {
       setRunning(false);
@@ -271,14 +325,14 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
           key: "trust",
           label: "Trust evaluation",
           ...stageFor("trust", () =>
-            detail && detail.trust_score !== null
+            detail && typeof detail.trust_score === "number"
               ? { state: "done" as StageState, note: `${detail.trust_score} / 100` }
               : { state: (running ? "active" : "queued") as StageState }
           ),
         },
         {
           key: "completed",
-          label: result && !running ? `Completed · ${result.verdict.replace("_", " ")}` : "Completed",
+          label: result && !running ? `Completed · ${result.verdict.replace(/_/g, " ")}` : "Completed",
           ...stageFor("completed", () => ({
             state: (result && !running ? "done" : "queued") as StageState,
           })),
@@ -409,7 +463,7 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
             <div>
               <div style={{ fontSize: 10, color: "var(--gray-600)", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 2 }}>Final decision</div>
               <div style={{ fontSize: "var(--text-14)", fontWeight: 700, color: result.verdict === "declined" ? "var(--risk-critical-text)" : result.verdict === "under_review" ? "var(--risk-medium-text)" : "var(--status-success)", textTransform: "uppercase" }}>
-                {result.verdict.replace("_", " ")}
+                {result.verdict.replace(/_/g, " ")}
               </div>
             </div>
             <div>
@@ -421,7 +475,10 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
               <div style={{ fontSize: "var(--text-13)", color: "var(--gray-200)" }}>
                 {(result.requires_human_review || liveReviewId) ? (
                   <>
-                    Pending{result.review_id || liveReviewId ? ` · ${(result.review_id ?? liveReviewId ?? "").slice(0, 8)}` : ""} —{" "}
+                    Pending{(() => {
+                      const id = result.review_id ?? liveReviewId;
+                      return id ? ` · ${String(id).slice(0, 8)}` : "";
+                    })()} —{" "}
                     <Link href="/dashboard/reviews" style={{ color: "var(--accent)", textDecoration: "underline" }}>open review queue</Link>
                   </>
                 ) : (
@@ -431,9 +488,9 @@ export default function InterceptConsole({ onIntercepted }: { onIntercepted?: (t
             </div>
           </div>
 
-          {result.reasons.length > 0 && (
+          {(result.reasons ?? []).length > 0 && (
             <ul style={{ margin: "0 0 12px 18px", fontSize: "var(--text-13)", color: "var(--gray-300)" }}>
-              {result.reasons.map((r, i) => <li key={i}>{r}</li>)}
+              {(result.reasons ?? []).map((r, i) => <li key={i}>{r}</li>)}
             </ul>
           )}
 

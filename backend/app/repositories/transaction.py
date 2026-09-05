@@ -233,15 +233,24 @@ class TransactionRepository:
         )
         return result.scalars().first()
 
-    async def list_transactions(self, limit: int = 50) -> List[Transaction]:
+    async def list_transactions(
+        self, limit: int = 50, customer_id: Optional[uuid.UUID] = None
+    ) -> List[Transaction]:
         # Eager-load account so async callers (e.g. intercept AML context)
         # can read tx.account.customer_id without lazy-load failures.
-        result = await self.db.execute(
+        # Optional customer scoping keeps one tenant's history out of
+        # another customer's agent context. Limit is clamped defensively
+        # even when callers forget bounds.
+        query = (
             select(Transaction)
             .options(joinedload(Transaction.account))
             .order_by(desc(Transaction.initiated_at))
-            .limit(limit)
         )
+        if customer_id is not None:
+            query = query.join(Account, Transaction.account_id == Account.id).where(
+                Account.customer_id == customer_id
+            )
+        result = await self.db.execute(query.limit(max(1, min(limit, 200))))
         return list(result.scalars().all())
 
     @staticmethod
@@ -311,8 +320,10 @@ class TransactionRepository:
 
         # 2. Save Policy Checks
         sim_res = state.get("policy_simulation")
-        if sim_res:
-            for pc in sim_res.get("policies_checked", []):
+        if isinstance(sim_res, dict):
+            for pc in sim_res.get("policies_checked", []) or []:
+                if not isinstance(pc, dict):
+                    continue
                 chk = PolicyCheck(
                     id=uuid.uuid4(),
                     transaction_id=transaction_id,

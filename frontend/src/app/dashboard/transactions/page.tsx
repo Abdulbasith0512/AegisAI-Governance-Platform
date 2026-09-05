@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
@@ -14,6 +14,19 @@ import type { Transaction, RiskLevel, TxStatus } from '@/lib/mockData';
 import InterceptConsole from './intercept-console';
 import { ApiError, getAuditHistory, getReviewQueue, getTransactionDetail, getTransactionsHistory, verifyAuditChain } from "@/lib/api";
 import type { AuditEvent, AuditVerify, ReviewQueueItem, TransactionDetail } from "@/lib/api";
+
+// Display helpers that never invent data: missing values render as "—",
+// never as epoch dates, zeros, or inherited colors.
+function fmtDateTime(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString();
+}
+
+function safeLower(value: unknown): string {
+  return typeof value === "string" ? value.toLowerCase() : "";
+}
 
 // Amount histogram data
 function buildAmountHistogram(txs: Transaction[]) {
@@ -75,7 +88,7 @@ const COLUMNS: ColumnDef<Transaction>[] = [
     )},
   { key: 'country', header: 'Country', sortable: true, width: 70, mono: true },
   { key: 'timestamp', header: 'Time', sortable: true, width: 160, mono: true,
-    render: (v) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>{new Date(String(v)).toLocaleString()}</span> },
+    render: (v) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--gray-500)' }}>{fmtDateTime(v)}</span> },
 ];
 
 // ── Transactions Page (live governance data; backend is source of truth) ──
@@ -97,12 +110,13 @@ export default function Transactions() {
       const mapped: Transaction[] = data.map((t) => {
         const status = t.status === "declined" ? "declined" : (t.status === "under_review" ? "review" : "approved");
         const riskLevel: RiskLevel = t.status === "declined" ? "critical" : (t.status === "under_review" ? "medium" : "safe");
+        const accountId = typeof t.account_id === "string" ? t.account_id : "";
         return {
           id: t.id,
-          customerId: t.account_id,
-          customerName: `Customer ${t.account_id.slice(0, 8).toUpperCase()}`,
+          customerId: accountId,
+          customerName: accountId ? `Customer ${accountId.slice(0, 8).toUpperCase()}` : "Unknown customer",
           merchantName: t.merchant_id ? `Merchant ${t.merchant_id.slice(0, 8).toUpperCase()}` : "Direct transfer",
-          merchantCategory: t.transaction_type.toUpperCase(),
+          merchantCategory: typeof t.transaction_type === "string" ? t.transaction_type.toUpperCase() : "UNKNOWN",
           amount: t.amount,
           currency: t.currency,
           riskScore: 0,
@@ -130,10 +144,18 @@ export default function Transactions() {
     void initial();
   }, [loadHistory]);
 
-  // Highlight a newly intercepted transaction and refresh the list
+  // Highlight a newly intercepted transaction and refresh the list.
+  // The timer only clears the highlight; it never fabricates rows.
+  const highlightTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    return () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    };
+  }, []);
   const handleIntercepted = useCallback(async (txId: string) => {
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
     setNewRowIds(new Set([txId]));
-    setTimeout(() => setNewRowIds(new Set()), 4000);
+    highlightTimer.current = setTimeout(() => setNewRowIds(new Set()), 4000);
     await loadHistory();
   }, [loadHistory]);
 
@@ -143,10 +165,10 @@ export default function Transactions() {
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(t =>
-        t.id.toLowerCase().includes(q) ||
-        t.customerName.toLowerCase().includes(q) ||
-        t.merchantName.toLowerCase().includes(q) ||
-        t.country.toLowerCase().includes(q)
+        safeLower(t.id).includes(q) ||
+        safeLower(t.customerName).includes(q) ||
+        safeLower(t.merchantName).includes(q) ||
+        safeLower(t.country).includes(q)
       );
     }
     const riskF = activeFilters['riskLevel'];
@@ -195,7 +217,7 @@ export default function Transactions() {
               <Tooltip content={<SharedTooltip />} />
               <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                 {riskHisto.map((entry, i) => (
-                  <rect key={i} fill={entry.color} />
+                  <Cell key={i} fill={entry.color} />
                 ))}
               </Bar>
             </BarChart>
@@ -243,7 +265,7 @@ export default function Transactions() {
         open={!!selectedTx}
         onClose={() => setSelectedTx(null)}
         title={selectedTx?.id}
-        subtitle={`${selectedTx?.customerName} · ${selectedTx?.merchantName}`}
+        subtitle={[selectedTx?.customerName, selectedTx?.merchantName].filter(Boolean).join(" · ") || undefined}
       >
         {selectedTx && <TxDetail tx={selectedTx} />}
       </Drawer>
@@ -261,39 +283,46 @@ function TxDetail({ tx }: { tx: Transaction }) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function loadDetails() {
       setLoading(true);
       setLoadError(null);
       try {
         const data = await getTransactionDetail(tx.id);
-        setDetails(data);
+        if (!cancelled) setDetails(data);
       } catch (err) {
-        setLoadError(err instanceof ApiError ? err.message : "Failed to load transaction record.");
-        setDetails(null);
+        if (!cancelled) {
+          setLoadError(err instanceof ApiError ? err.message : "Failed to load transaction record.");
+          setDetails(null);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
       // Human review status for this transaction (best-effort enrichment)
       try {
         const queue = await getReviewQueue();
-        setReview(queue.find((r) => r.transaction_id === tx.id) ?? null);
+        if (!cancelled) setReview(queue.find((r) => r.transaction_id === tx.id) ?? null);
       } catch {
-        setReview(null);
+        if (!cancelled) setReview(null);
       }
-      // Immutable ledger slice + chain verdict (best-effort enrichment)
-      try {
-        const [history, verify] = await Promise.all([
-          getAuditHistory(tx.id),
-          verifyAuditChain(tx.id),
-        ]);
-        setAudit(history.events);
-        setAuditVerify(verify);
-      } catch {
+      // Immutable ledger slice + chain verdict (best-effort enrichment).
+      // allSettled: a verify failure must not discard loaded events.
+      const [historyRes, verifyRes] = await Promise.allSettled([
+        getAuditHistory(tx.id),
+        verifyAuditChain(tx.id),
+      ]);
+      if (cancelled) return;
+      if (historyRes.status === "fulfilled" && Array.isArray(historyRes.value?.events)) {
+        setAudit(historyRes.value.events);
+      } else {
         setAudit([]);
-        setAuditVerify(null);
       }
+      setAuditVerify(verifyRes.status === "fulfilled" ? verifyRes.value : null);
     }
     void loadDetails();
+    return () => {
+      cancelled = true;
+    };
   }, [tx.id]);
 
   if (loading) {
@@ -310,15 +339,18 @@ function TxDetail({ tx }: { tx: Transaction }) {
 
   const activeTx = details.transaction;
   const trust = details.trust_score ?? 0;
+  const detailStatusKey = (activeTx.status === 'under_review' ? 'review' : activeTx.status) as TxStatus;
+  const detailStatusColor = STATUS_COLORS[detailStatusKey] ?? 'var(--gray-400)';
+  const detailStatusLabel = typeof activeTx.status === 'string' ? activeTx.status : 'unknown';
   const explanation = details.explanation ?? "No explanation generated.";
   const predictions = details.predictions ?? [];
 
   const timelineEvents = [
     { label: 'Transaction received and validated', status: 'done' },
     { label: `Policies checks resolved: ${details.policy_status || 'PASS'}`, status: details.policy_status === 'fail' ? 'error' : 'done' },
-    { label: `Agent consensus scored: ${((details.consensus_score || 1.0) * 100).toFixed(0)}%`, status: 'done' },
+    { label: `Agent consensus scored: ${((details.consensus_score ?? 1.0) * 100).toFixed(0)}%`, status: 'done' },
     { label: `Overall trust score resolved: ${trust} / 100`, status: trust < 60 ? 'error' : 'done' },
-    { label: `Verdict output: ${activeTx.status.toUpperCase()}`, status: activeTx.status === 'declined' ? 'error' : 'done' }
+    { label: `Verdict output: ${String(activeTx.status ?? 'unknown').toUpperCase()}`, status: activeTx.status === 'declined' ? 'error' : 'done' }
   ];
 
   const fields: [string, string][] = [
@@ -332,7 +364,7 @@ function TxDetail({ tx }: { tx: Transaction }) {
     ['Trust Level', `${trust} / 100`],
     ['Status', activeTx.status.toUpperCase()],
     ['Reference Number', activeTx.reference_number || 'none'],
-    ['Timestamp', new Date(activeTx.initiated_at).toLocaleString()]
+    ['Timestamp', fmtDateTime(activeTx.initiated_at)]
   ];
 
   return (
@@ -342,10 +374,10 @@ function TxDetail({ tx }: { tx: Transaction }) {
         <RiskBadge level={trust < 50 ? 'critical' : (trust < 75 ? 'medium' : 'safe')} score={100 - trust} />
         <span style={{
           fontSize: 'var(--text-11)', fontWeight: 700,
-          color: STATUS_COLORS[(activeTx.status === 'under_review' ? 'review' : activeTx.status) as TxStatus] || STATUS_COLORS['approved'], textTransform: 'uppercase',
+          color: detailStatusColor, textTransform: 'uppercase',
           letterSpacing: '0.04em', padding: '2px 7px', borderRadius: 9999,
           background: 'var(--surface-3)', border: '1px solid var(--border-2)',
-        }}>{activeTx.status}</span>
+        }}>{detailStatusLabel}</span>
       </div>
 
       {/* Fields grid */}
@@ -440,7 +472,7 @@ function TxDetail({ tx }: { tx: Transaction }) {
           <div style={{ fontSize: 'var(--text-13)', color: 'var(--gray-200)', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div>Status: <strong style={{ textTransform: 'uppercase' }}>{review.status}</strong></div>
             <div style={{ color: 'var(--gray-400)', fontSize: 'var(--text-12)' }}>
-              Reviewer: {review.reviewer_name ?? 'Unassigned'} · SLA {review.is_sla_breached ? 'breached' : `due ${new Date(review.sla_deadline).toLocaleString()}`}
+              Reviewer: {review.reviewer_name ?? 'Unassigned'} · SLA {review.is_sla_breached ? 'breached' : `due ${fmtDateTime(review.sla_deadline)}`}
             </div>
           </div>
         ) : (
@@ -480,7 +512,7 @@ function TxDetail({ tx }: { tx: Transaction }) {
                 <div style={{ paddingBottom: 8, minWidth: 0 }}>
                   <div style={{ fontSize: 'var(--text-13)', color: 'var(--gray-200)', fontFamily: 'var(--font-mono)' }}>{evt.event_type}</div>
                   <div style={{ fontSize: 'var(--text-11)', color: 'var(--gray-500)' }}>
-                    {new Date(evt.timestamp).toLocaleString()} · {evt.actor ?? 'system'} · #{evt.ledger_hash.slice(0, 8)}
+                    {fmtDateTime(evt.timestamp)} · {evt.actor ?? 'system'} · #{typeof evt.ledger_hash === 'string' ? evt.ledger_hash.slice(0, 8) : '—'}
                   </div>
                 </div>
               </div>
