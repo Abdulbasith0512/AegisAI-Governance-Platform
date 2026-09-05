@@ -14,7 +14,7 @@ pytest.importorskip("sqlalchemy")
 from sqlalchemy import select
 
 from app.repositories.audit import verify_ledger_chain
-from conftest import requires_db
+from .conftest import requires_db
 
 LIFECYCLE_TYPES = [
     "transaction.received",

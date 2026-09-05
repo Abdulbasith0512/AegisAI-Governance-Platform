@@ -20,7 +20,7 @@ pytest.importorskip("httpx")
 
 from sqlalchemy import select
 
-from conftest import requires_db
+from .conftest import requires_db
 
 pytestmark = requires_db
 

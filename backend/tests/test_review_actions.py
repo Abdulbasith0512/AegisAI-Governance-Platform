@@ -96,7 +96,7 @@ async def test_invalid_token_rejected() -> None:
         await get_token_payload(token="forged.token.value", redis=_Redis())
 
 
-from conftest import requires_db
+from .conftest import requires_db
 
 pytestmark_needs_db = requires_db
 
