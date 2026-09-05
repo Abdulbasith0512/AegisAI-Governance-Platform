@@ -14,7 +14,10 @@ pytest.importorskip("sqlalchemy")
 from sqlalchemy import select
 
 from app.repositories.audit import verify_ledger_chain
-from conftest import requires_db
+try:
+    from conftest import requires_db  # when tests/ is on sys.path (backend/ CWD)
+except ImportError:
+    from backend.tests.conftest import requires_db  # package import (repo-root CWD)
 
 LIFECYCLE_TYPES = [
     "transaction.received",

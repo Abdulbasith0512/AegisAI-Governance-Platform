@@ -1,6 +1,12 @@
+import os
 import pytest
 from app.database.neo4j_db import Neo4jDatabaseManager
 from app.services.knowledge_graph import KnowledgeGraphService
+
+needs_neo4j = pytest.mark.skipif(
+    not os.getenv("TEST_NEO4J_URI"),
+    reason="TEST_NEO4J_URI not set; live graph tests skipped",
+)
 
 def test_neo4j_manager_initialization() -> None:
     """
@@ -15,35 +21,41 @@ def test_neo4j_manager_initialization() -> None:
 
 def test_knowledge_graph_service_mock_visuals() -> None:
     """
-    Verifies visualization structures output under mock/real scenarios.
+    Unreachable graph returns an explicitly labeled empty graph —
+    never fabricated demo nodes.
     """
     service = KnowledgeGraphService()
+    if not service.db.use_mock:
+        pytest.skip("live Neo4j connected; empty-graph contract is mock-only")
     service.seed_mock_knowledge_graph()
     res = service.get_graph_visualization()
-    
-    assert "nodes" in res
-    assert "links" in res
-    assert len(res["nodes"]) > 0
+
+    assert res["nodes"] == []
+    assert res["links"] == []
+    assert res.get("mock") is True
 
 def test_knowledge_graph_shortest_path() -> None:
     """
-    Verifies that pathfinding returns valid hop sequences.
+    Unreachable graph reports no path instead of inventing hops.
     """
     service = KnowledgeGraphService()
+    if not service.db.use_mock:
+        pytest.skip("live Neo4j connected; no-path contract is mock-only")
     service.seed_mock_knowledge_graph()
     res = service.find_shortest_fraud_path("acc-101", "acc-103")
-    
-    assert res["path_found"] is True
-    assert "acc-102" in res["hops"]
+
+    assert res["path_found"] is False
+    assert res["hops"] == []
 
 def test_knowledge_graph_risk_propagation() -> None:
     """
-    Verifies that risk scores propagate.
+    Unreachable graph returns an empty risk map instead of fixed scores.
     """
     service = KnowledgeGraphService()
+    if not service.db.use_mock:
+        pytest.skip("live Neo4j connected; empty-map contract is mock-only")
     service.seed_mock_knowledge_graph()
     res = service.propagate_risk_scores("cust-2")
-    
+
     assert res["start_node"] == "cust-2"
-    assert "acc-102" in res["propagated_risk_map"]
-    assert res["propagated_risk_map"]["acc-102"] == 59.5
+    assert res["propagated_risk_map"] == {}

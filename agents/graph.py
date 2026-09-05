@@ -23,6 +23,33 @@ class AgentGraphState(TypedDict):
     explainability_result: AgentResponse
     supervisor_result: AgentResponse
 
+
+class AgentGraphSideChannel(TypedDict, total=False):
+    """
+    Agent-produced evidence bundles. Declared (not inferred) because
+    LangGraph drops node updates whose keys are missing from the schema.
+    """
+    device_prob: float
+    kyc_prob: float
+    fraud_prob: float
+    behavior_prob: float
+    aml_prob: float
+    fraud_features: Dict[str, Any]
+    behavior_features: Dict[str, Any]
+    policy_simulation: Dict[str, Any]
+    explanation_data: Dict[str, Any]
+    trust_score_value: int
+    trust_weights: Dict[str, Any]
+    trust_reasons: Dict[str, Any]
+    consensus_ratio: float
+    consensus_votes: Dict[str, Any]
+    supervisor_decision: Dict[str, Any]
+    decision_explanation: Dict[str, Any]
+
+
+class AgentGraphFullState(AgentGraphState, AgentGraphSideChannel):
+    """Complete graph state: required results plus optional evidence."""
+
 # Initialize nodes as instances
 device_agent = DeviceAgent()
 kyc_agent = KYCAgent()
@@ -33,36 +60,41 @@ explain_agent = ExplainabilityAgent()
 supervisor_agent = SupervisorAgent()
 
 # Define Async Node functions mapping state mutations
+# NOTE (langgraph>=1.x): node inputs are snapshots — in-place mutations an
+# agent makes to `state` (trust scores, evidence bundles, decision dicts)
+# are DISCARDED unless returned. Each wrapper therefore diffs top-level
+# keys and returns every addition so downstream nodes, the endpoint, and
+# persistence actually receive them.
+async def _run_agent(agent, result_key: str, state: AgentGraphState) -> Dict[str, Any]:
+    before = set(state.keys())
+    res = await agent.run(state)
+    updates = {key: state[key] for key in state.keys() - before}
+    updates[result_key] = res
+    return updates
+
 async def run_device_agent(state: AgentGraphState) -> Dict[str, Any]:
-    res = await device_agent.run(state)
-    return {"device_result": res}
+    return await _run_agent(device_agent, "device_result", state)
 
 async def run_kyc_agent(state: AgentGraphState) -> Dict[str, Any]:
-    res = await kyc_agent.run(state)
-    return {"kyc_result": res}
+    return await _run_agent(kyc_agent, "kyc_result", state)
 
 async def run_fraud_agent(state: AgentGraphState) -> Dict[str, Any]:
-    res = await fraud_agent.run(state)
-    return {"fraud_result": res}
+    return await _run_agent(fraud_agent, "fraud_result", state)
 
 async def run_aml_agent(state: AgentGraphState) -> Dict[str, Any]:
-    res = await aml_agent.run(state)
-    return {"aml_result": res}
+    return await _run_agent(aml_agent, "aml_result", state)
 
 async def run_policy_agent(state: AgentGraphState) -> Dict[str, Any]:
-    res = await policy_agent.run(state)
-    return {"policy_result": res}
+    return await _run_agent(policy_agent, "policy_result", state)
 
 async def run_explainability_agent(state: AgentGraphState) -> Dict[str, Any]:
-    res = await explain_agent.run(state)
-    return {"explainability_result": res}
+    return await _run_agent(explain_agent, "explainability_result", state)
 
 async def run_supervisor_agent(state: AgentGraphState) -> Dict[str, Any]:
-    res = await supervisor_agent.run(state)
-    return {"supervisor_result": res}
+    return await _run_agent(supervisor_agent, "supervisor_result", state)
 
 # Construct the StateGraph
-workflow = StateGraph(AgentGraphState)
+workflow = StateGraph(AgentGraphFullState)
 
 # Register Nodes
 workflow.add_node("device_node", run_device_agent)

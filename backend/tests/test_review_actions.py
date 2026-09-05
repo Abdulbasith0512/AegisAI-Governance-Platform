@@ -96,7 +96,10 @@ async def test_invalid_token_rejected() -> None:
         await get_token_payload(token="forged.token.value", redis=_Redis())
 
 
-from conftest import requires_db
+try:
+    from conftest import requires_db  # when tests/ is on sys.path (backend/ CWD)
+except ImportError:
+    from backend.tests.conftest import requires_db  # package import (repo-root CWD)
 
 pytestmark_needs_db = requires_db
 

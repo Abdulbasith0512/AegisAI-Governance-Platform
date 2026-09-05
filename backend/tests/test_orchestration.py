@@ -1,5 +1,6 @@
 import sys
 import os
+import uuid
 import pytest
 
 # Ensure the root directory is in the PYTHONPATH to find the top-level agents directory
@@ -13,7 +14,7 @@ from agents.fraud import FraudAgent
 
 def _low_risk_tx(**overrides):
     tx = {
-        "id": "test-tx-001",
+        "id": str(uuid.uuid4()),
         "amount": 250.00,
         "currency": "USD",
         "reference_number": "TX-TEST01",

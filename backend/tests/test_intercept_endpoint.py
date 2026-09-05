@@ -14,7 +14,10 @@ import pytest
 pytest.importorskip("sqlalchemy")
 pytest.importorskip("httpx")
 
-from conftest import requires_db
+try:
+    from conftest import requires_db  # when tests/ is on sys.path (backend/ CWD)
+except ImportError:
+    from backend.tests.conftest import requires_db  # package import (repo-root CWD)
 
 pytestmark = requires_db
 
