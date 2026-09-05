@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = Field(default="development", description="Execution environment (development, staging, production).")
     LOG_LEVEL: str = Field(default="INFO", description="Log level thresholds (DEBUG, INFO, WARNING, ERROR).")
     SECRET_KEY: str = Field(default="aegisai_default_secret_key_change_me_in_production_environments_32_chars", description="JWT secret hashing sign key.")
+    ALLOW_DEV_BYPASS: bool = Field(
+        default=False,
+        description="Allow unauthenticated dev-admin bypass (development only, never enable in production).",
+    )
+    SETUP_TOKEN: str = Field(
+        default="",
+        description="One-time bootstrap token required by POST /api/v1/admin/seed via X-Setup-Token header. Empty disables the check (local dev only).",
+    )
 
     # Server Bind configurations
     BACKEND_HOST: str = Field(default="0.0.0.0", description="IP address bind target.")

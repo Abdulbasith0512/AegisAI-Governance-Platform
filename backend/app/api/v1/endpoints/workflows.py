@@ -3,7 +3,8 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, require_permission
+from app.models.users import User
 from app.repositories.workflows import WorkflowRepository
 from app.services.workflow_engine import WorkflowExecutionEngine
 from app.schemas.workflows import (
@@ -11,7 +12,11 @@ from app.schemas.workflows import (
     ExecuteWorkflowRequest, WorkflowRunRead
 )
 
-router = APIRouter(prefix="/workflows", tags=["AI Governance Studio"])
+router = APIRouter(
+    prefix="/workflows",
+    tags=["AI Governance Studio"],
+    dependencies=[Depends(require_permission("read:transactions"))],
+)
 
 def get_workflow_repo(db: AsyncSession = Depends(get_db)) -> WorkflowRepository:
     return WorkflowRepository(db)
@@ -26,7 +31,8 @@ def get_engine(repo: WorkflowRepository = Depends(get_workflow_repo)) -> Workflo
 @router.post("/", response_model=WorkflowRead, status_code=status.HTTP_201_CREATED)
 async def create_workflow(
     workflow: WorkflowCreate,
-    repo: WorkflowRepository = Depends(get_workflow_repo)
+    repo: WorkflowRepository = Depends(get_workflow_repo),
+    current_user: User = Depends(require_permission("write:policies"))
 ):
     """Create a new Workflow draft and initialize version 1."""
     return await repo.create_workflow(workflow)
@@ -53,7 +59,8 @@ async def get_workflow(
 async def update_workflow(
     workflow_id: uuid.UUID,
     update_data: WorkflowUpdate,
-    repo: WorkflowRepository = Depends(get_workflow_repo)
+    repo: WorkflowRepository = Depends(get_workflow_repo),
+    current_user: User = Depends(require_permission("write:policies"))
 ):
     workflow = await repo.update_workflow(workflow_id, update_data)
     if not workflow:
@@ -63,7 +70,8 @@ async def update_workflow(
 @router.delete("/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workflow(
     workflow_id: uuid.UUID,
-    repo: WorkflowRepository = Depends(get_workflow_repo)
+    repo: WorkflowRepository = Depends(get_workflow_repo),
+    current_user: User = Depends(require_permission("write:policies"))
 ):
     success = await repo.delete_workflow(workflow_id)
     if not success:
@@ -78,7 +86,8 @@ async def delete_workflow(
 async def save_workflow_graph(
     version_id: uuid.UUID,
     payload: Dict[str, Any],
-    repo: WorkflowRepository = Depends(get_workflow_repo)
+    repo: WorkflowRepository = Depends(get_workflow_repo),
+    current_user: User = Depends(require_permission("write:policies"))
 ):
     """
     Saves the React Flow JSON and converts it into SQL node/edge records.
@@ -102,7 +111,8 @@ async def execute_workflow(
     version_id: uuid.UUID,
     request: ExecuteWorkflowRequest,
     repo: WorkflowRepository = Depends(get_workflow_repo),
-    engine: WorkflowExecutionEngine = Depends(get_engine)
+    engine: WorkflowExecutionEngine = Depends(get_engine),
+    current_user: User = Depends(require_permission("write:policies"))
 ):
     """
     Validates and executes a specific workflow version DAG.

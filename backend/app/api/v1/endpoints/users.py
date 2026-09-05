@@ -163,7 +163,8 @@ class UserInviteRequest(BaseModel):
 async def invite_team_member(
     payload: UserInviteRequest,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("write:users"))
 ):
     """
     Invites a new colleague. Creates a pending user row and triggers invitation mail.

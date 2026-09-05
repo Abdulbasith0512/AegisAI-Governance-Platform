@@ -4,6 +4,11 @@ import sys
 # Add workspace root directory (parent of 'backend') to python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
+# The test harness exercises authenticated endpoints without minting JWTs:
+# it opts into the explicit development bypass. Production defaults stay
+# fail-closed (ALLOW_DEV_BYPASS defaults to False in settings).
+os.environ.setdefault("ALLOW_DEV_BYPASS", "true")
+
 import pytest
 import pytest_asyncio
 
@@ -49,10 +54,10 @@ async def db_session(test_engine):
 async def api_client(db_session):
     """ASGI client with the DB session overridden.
 
-    Auth relies on the development bypass (no bearer token): with
-    ENVIRONMENT=development (the default), get_token_payload returns a mock
-    admin payload and get_current_user provisions a dev user, so no JWT
-    fixtures are needed. Redis/Qdrant absences are fail-open by design.
+    Auth relies on the explicit development bypass (ALLOW_DEV_BYPASS=true,
+    set above): get_token_payload returns a mock admin payload and
+    get_current_user provisions a dev user, so no JWT fixtures are needed.
+    Redis/Qdrant absences are fail-open by design.
     """
     pytest.importorskip("fastapi")
     pytest.importorskip("httpx")

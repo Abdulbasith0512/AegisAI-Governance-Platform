@@ -1,9 +1,10 @@
 import uuid
-from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config.loader import settings
 from app.core.dependencies import get_db, require_permission
 from app.schemas.user import RoleOut, RoleCreate, PermissionOut, UserOut
 from app.repositories.user import UserRepository
@@ -66,11 +67,20 @@ async def read_permissions(
     return await user_repo.list_permissions()
 
 @router.post("/seed", response_model=Dict[str, str])
-async def seed_database(db: AsyncSession = Depends(get_db)) -> Dict[str, str]:
+async def seed_database(
+    db: AsyncSession = Depends(get_db),
+    x_setup_token: Optional[str] = Header(default=None),
+) -> Dict[str, str]:
     """
     Seed initial system permissions, roles, and default admin operator.
-    Can only be executed if the roles table is empty.
+    Can only be executed if the roles table is empty. When AEGIS_SETUP_TOKEN
+    is configured, the matching X-Setup-Token header is additionally required.
     """
+    if settings.SETUP_TOKEN and x_setup_token != settings.SETUP_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Valid setup token required."
+        )
     user_repo = UserRepository(db)
     audit_repo = AuditRepository(db)
 

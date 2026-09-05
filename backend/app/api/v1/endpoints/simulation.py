@@ -4,7 +4,8 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, require_permission
+from app.models.users import User
 from app.repositories.simulation import SimulationRepository
 from app.services.simulation_engine import SimulationEngine
 from app.schemas.simulation import (
@@ -12,7 +13,11 @@ from app.schemas.simulation import (
     SimulationRunRead, SimulationResultRead, SimulationMetricRead, SimulationEventRead
 )
 
-router = APIRouter(prefix="/simulation", tags=["Governance Simulation (Digital Twin)"])
+router = APIRouter(
+    prefix="/simulation",
+    tags=["Governance Simulation (Digital Twin)"],
+    dependencies=[Depends(require_permission("read:transactions"))],
+)
 
 def get_sim_repo(db: AsyncSession = Depends(get_db)) -> SimulationRepository:
     return SimulationRepository(db)
@@ -26,7 +31,8 @@ def get_engine(repo: SimulationRepository = Depends(get_sim_repo)) -> Simulation
 @router.post("/scenarios", response_model=SimulationScenarioRead, status_code=status.HTTP_201_CREATED)
 async def create_scenario(
     scenario: SimulationScenarioCreate,
-    repo: SimulationRepository = Depends(get_sim_repo)
+    repo: SimulationRepository = Depends(get_sim_repo),
+    current_user: User = Depends(require_permission("write:policies"))
 ):
     """Create a new Digital Twin simulation scenario configuration."""
     return await repo.create_scenario(scenario)
@@ -56,7 +62,8 @@ async def trigger_simulation_run(
     scenario_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     repo: SimulationRepository = Depends(get_sim_repo),
-    engine: SimulationEngine = Depends(get_engine)
+    engine: SimulationEngine = Depends(get_engine),
+    current_user: User = Depends(require_permission("write:policies"))
 ):
     """Trigger a simulation execution in the background."""
     scenario = await repo.get_scenario(scenario_id)

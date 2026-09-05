@@ -2,7 +2,8 @@ import uuid
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, require_permission
+from app.models.users import User
 from app.repositories.agents import AgentMLOpsRepository
 from app.services.mlops import MLOpsService
 from app.schemas.mlops import (
@@ -16,7 +17,11 @@ from app.schemas.mlops import (
     DeploymentHistoryOut
 )
 
-router: APIRouter = APIRouter(prefix="/agents", tags=["MLOps Registry"])
+router: APIRouter = APIRouter(
+    prefix="/agents",
+    tags=["MLOps Registry"],
+    dependencies=[Depends(require_permission("read:transactions"))],
+)
 
 @router.get("", response_model=List[Dict[str, Any]])
 async def list_registered_agents(db: AsyncSession = Depends(get_db)) -> List[Dict[str, Any]]:
@@ -61,7 +66,8 @@ async def list_model_versions(agent_id: uuid.UUID, db: AsyncSession = Depends(ge
 async def register_model_version(
     agent_id: uuid.UUID,
     schema: ModelVersionCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("write:policies"))
 ) -> ModelVersionOut:
     """
     Registers a new trained version checkpoint of an agent into the registry.
@@ -128,7 +134,8 @@ async def get_agent_deployment_config(agent_id: uuid.UUID, db: AsyncSession = De
 @router.post("/deployments/configure", response_model=Dict[str, str])
 async def configure_deployment_strategy(
     schema: DeploymentConfigUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("write:policies"))
 ) -> Dict[str, str]:
     """
     Promotes models and modifies live deployment traffic configurations.
@@ -156,7 +163,8 @@ async def configure_deployment_strategy(
 @router.post("/deployments/rollback", response_model=Dict[str, str])
 async def rollback_model_version(
     schema: RollbackRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("write:policies"))
 ) -> Dict[str, str]:
     """
     Reverts deployment target immediately to a certified historic model version.
@@ -209,7 +217,8 @@ async def list_mlflow_experiment_runs(agent_id: Optional[uuid.UUID] = None, db: 
 @router.post("/mlflow/runs", response_model=Dict[str, str])
 async def log_mlflow_experiment_run(
     schema: MLflowRunCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("write:policies"))
 ) -> Dict[str, str]:
     """
     Logs hyperparameters and test metrics to standard MLflow run logs schema.

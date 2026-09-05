@@ -21,6 +21,12 @@ logger = logging.getLogger("aegisai.dependencies")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
+
+def _dev_bypass_enabled() -> bool:
+    """Unauthenticated dev-admin bypass. Explicit opt-in only — the default
+    is fail-closed (401) even in development."""
+    return settings.ENVIRONMENT == "development" and settings.ALLOW_DEV_BYPASS
+
 async def get_db(session: AsyncSession = Depends(get_db_session)) -> AsyncGenerator[AsyncSession, None]:
     """
     Yields active PostgreSQL database sessions.
@@ -48,7 +54,7 @@ async def get_token_payload(
     Cross-checks JTI tokens against Redis blacklist registries.
     """
     if not token:
-        if settings.ENVIRONMENT == "development":
+        if _dev_bypass_enabled():
             return TokenPayload(
                 sub="dev@aegisai.com",
                 jti="mock_jti",
@@ -60,6 +66,10 @@ async def get_token_payload(
 
     try:
         payload_data = decode_token(token)
+        # Refresh tokens must never authorize API calls; the refresh
+        # endpoint validates them separately via the request body.
+        if payload_data.get("type", "access") != "access":
+            raise AuthenticationException("Invalid authentication signature.")
         token_payload = TokenPayload(
             sub=payload_data.get("sub"),
             jti=payload_data.get("jti"),
@@ -103,7 +113,7 @@ async def get_current_user(
         user_repo = UserRepository(db)
         user = await user_repo.get_user_by_email(payload.sub)
         if not user:
-            if settings.ENVIRONMENT == "development":
+            if _dev_bypass_enabled():
                 user = await user_repo.create_mock_dev_user()
             else:
                 raise AuthenticationException("User account not found.")
@@ -111,7 +121,7 @@ async def get_current_user(
             raise AuthenticationException("User account is suspended.")
         return user
     except Exception as e:
-        if settings.ENVIRONMENT == "development":
+        if _dev_bypass_enabled():
             dev_perms = [type("Permission", (), {"name": p})() for p in (payload.permissions or ["read:transactions", "write:transactions", "write:policies"])]
             dev_role = type("Role", (), {"name": payload.role or "admin", "permissions": dev_perms})()
             return type("User", (), {

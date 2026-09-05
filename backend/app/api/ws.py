@@ -1,21 +1,26 @@
 """WebSocket stream of live transaction execution events.
 
-Route: WS /ws/transactions/{tx_id}
+Route: WS /ws/transactions/{tx_id}?token=<JWT access token>
 
 Streams the canonical envelopes from app.services.event_bus for one
 transaction: transaction.received, agent.started/completed/failed,
 policy.evaluated, trust.calculated, decision.created, review.created.
 
-Auth follows the REST development bypass (no token required while
-ENVIRONMENT=development). Production follow-up: validate a JWT on
-connect (?token= or subprotocol) and close with 4401 when invalid.
+Auth: a valid access-type JWT is required via ?token=, except when the
+explicit development bypass is enabled (ALLOW_DEV_BYPASS=true with
+ENVIRONMENT=development). Invalid tokens are rejected with close code
+4401 before subscribing.
 """
 
 import asyncio
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
+from app.config.loader import settings
+from app.core.exceptions import AuthenticationException
+from app.core.security import decode_token
 from app.services.event_bus import event_bus
 
 logger = logging.getLogger("aegisai.api.ws")
@@ -25,10 +30,40 @@ router = APIRouter(tags=["Execution Stream"])
 HEARTBEAT_SECONDS = 20
 
 
+def _dev_bypass_enabled() -> bool:
+    return settings.ENVIRONMENT == "development" and settings.ALLOW_DEV_BYPASS
+
+
+def _validate_ws_token(token: Optional[str]) -> None:
+    """Raise AuthenticationException unless the token is a valid access JWT."""
+    if not token:
+        if _dev_bypass_enabled():
+            return
+        raise AuthenticationException("Authentication credentials are required.")
+    try:
+        payload = decode_token(token)
+    except Exception as e:
+        raise AuthenticationException("Invalid authentication signature.") from e
+    if payload.get("type", "access") != "access":
+        raise AuthenticationException("Invalid authentication signature.")
+    if not payload.get("sub") or not payload.get("jti"):
+        raise AuthenticationException("Invalid token credentials payload.")
+
+
 @router.websocket("/ws/transactions/{tx_id}")
-async def transaction_execution_stream(websocket: WebSocket, tx_id: str) -> None:
+async def transaction_execution_stream(
+    websocket: WebSocket,
+    tx_id: str,
+    token: Optional[str] = Query(default=None),
+) -> None:
     """Stream execution events for one transaction until disconnect."""
     await websocket.accept()
+    try:
+        _validate_ws_token(token)
+    except AuthenticationException:
+        logger.warning("WS rejected tx_id=%s: invalid credentials", tx_id)
+        await websocket.close(code=4401)
+        return
     queue = await event_bus.subscribe(tx_id)
     logger.info("WS subscribed tx_id=%s", tx_id)
     try:

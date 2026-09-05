@@ -31,7 +31,17 @@ const MAX_ATTEMPTS = 10;
 
 function wsUrl(txId: string): string {
   const base = API_BASE_URL.replace(/^http/, "ws");
-  return `${base}/ws/transactions/${encodeURIComponent(txId)}`;
+  const url = `${base}/ws/transactions/${encodeURIComponent(txId)}`;
+  // Forward a stored JWT when the app has one; the backend accepts ?token=
+  // and falls back to its development bypass otherwise.
+  try {
+    const token =
+      typeof localStorage !== "undefined" ? localStorage.getItem("aegis_token") : null;
+    if (token) return `${url}?token=${encodeURIComponent(token)}`;
+  } catch {
+    /* storage unavailable — connect without token */
+  }
+  return url;
 }
 
 export function subscribeToTransaction(
@@ -97,9 +107,16 @@ export function subscribeToTransaction(
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev: CloseEvent) => {
       if (socket === ws) socket = null;
-      if (!closed) scheduleReconnect();
+      if (closed) return;
+      // 4401 = authentication rejected; retrying cannot succeed.
+      if (ev.code === 4401) {
+        setState("disconnected");
+        handlers.onExhausted?.();
+        return;
+      }
+      scheduleReconnect();
     };
   }
 
