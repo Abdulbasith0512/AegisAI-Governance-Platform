@@ -115,7 +115,10 @@ class ExplainabilityAgent(BaseGovernanceAgent):
             "reasoning": f"Explanation: {res['human_readable']}",
             "risk_score": 0.00,
             "flags": [],
-            "evidence": {"warnings": warnings, "feature_importance": agent_traces["feature_importance"]},
+            "evidence": {
+                "warnings": warnings,
+                "feature_importance": res.get("feature_importance", {}),
+            },
             "model": "attribution-placeholder-v1",
             "placeholder": True,
         }
