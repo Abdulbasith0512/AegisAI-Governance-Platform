@@ -88,7 +88,7 @@ app.add_middleware(
 register_exception_handlers(app)
 
 
-@app.get("/", tags=["System Control"])
+@app.get("/", tags=["System Control"], methods=["GET", "HEAD"])
 async def root() -> dict:
     """Platform probe: confirms the gateway booted (used by Render and uptime checks)."""
     return {
