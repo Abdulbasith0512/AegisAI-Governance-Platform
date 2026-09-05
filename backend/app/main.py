@@ -20,18 +20,46 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Manages FastAPI application startup and shutdown lifespan cycles.
     """
-    # Startup tasks: Init database pools, trigger connections checks
+    import logging as _logging
+
+    _log = _logging.getLogger("aegisai.main")
+    # Startup tasks: Init database pools, trigger connections checks.
+    # Production fails fast on an unreachable database so the platform
+    # never boots into silent mock behavior; development warns and
+    # continues for offline work.
     try:
         from app.database.database import engine
         from app.models import Base
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     except Exception as exc:
-        import logging
-        logging.getLogger("aegisai.main").warning(f"Database connection skipped or failed: {exc}. Operating with mock/in-memory data.")
+        if settings.ENVIRONMENT == "production":
+            _log.critical("Database unreachable at startup in production; refusing to boot: %s", exc)
+            raise
+        _log.warning(f"Database connection skipped or failed: {exc}. Operating with mock/in-memory data.")
     yield
-    # Shutdown tasks: Clean connections and free memory
-    pass
+    # Shutdown tasks: release pooled connections cleanly.
+    try:
+        from app.database.database import engine as _engine
+        from app.database.database import redis_client as _redis
+        from app.database.database import qdrant_client as _qdrant
+        from app.database.neo4j_db import Neo4jDatabaseManager
+
+        await _engine.dispose()
+        try:
+            await _redis.aclose()
+        except Exception as exc:
+            _log.debug("Redis close skipped: %s", exc)
+        try:
+            _qdrant.close()
+        except Exception as exc:
+            _log.debug("Qdrant close skipped: %s", exc)
+        try:
+            Neo4jDatabaseManager().close()
+        except Exception as exc:
+            _log.debug("Neo4j close skipped: %s", exc)
+    except Exception as exc:
+        _logging.getLogger("aegisai.main").warning("Shutdown cleanup incomplete: %s", exc)
 
 app: FastAPI = FastAPI(
     title=settings.PROJECT_NAME,
@@ -41,7 +69,13 @@ app: FastAPI = FastAPI(
     redoc_url="/redoc"
 )
 
-# Enable CORS configurations
+# NOTE: Starlette executes middleware in reverse registration order
+# (last added = outermost = runs first). Register inner layers first so
+# execution order is CORS -> RateLimit -> PromptFirewall: preflight OPTIONS
+# is handled before auth/rate gates, and abusive traffic is throttled
+# before inspection.
+app.add_middleware(PromptFirewallMiddleware)
+app.add_middleware(RateLimitMiddleware, limit=100, window_sec=60)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -50,12 +84,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add rate limiting and prompt firewall protection
-app.add_middleware(RateLimitMiddleware, limit=100, window_sec=60)
-app.add_middleware(PromptFirewallMiddleware)
-
 # Register Custom Exception Handler Policies
 register_exception_handlers(app)
+
+
+@app.get("/", tags=["System Control"])
+async def root() -> dict:
+    """Platform probe: confirms the gateway booted (used by Render and uptime checks)."""
+    return {
+        "name": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "status": "running",
+    }
+
 
 # Register Core Infrastructure Endpoints
 app.include_router(health.router)
