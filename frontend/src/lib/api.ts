@@ -133,37 +133,76 @@ async function handle<T>(res: Response, action: string): Promise<T> {
   }
 }
 
+// fetch() itself only throws on network-level failures (backend down,
+// wrong host/port, CORS preflight rejection, offline browser). Classify
+// those explicitly so the UI never shows an ambiguous message.
+async function request<T>(path: string, action: string, init?: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(path), init);
+  } catch {
+    throw new ApiError(
+      0,
+      `Backend unreachable at ${API_BASE_URL} — is it running, and is NEXT_PUBLIC_API_URL correct? (${action})`
+    );
+  }
+  return handle<T>(res, action);
+}
+
+export interface HealthStatus {
+  status: string;
+  [key: string]: unknown;
+}
+
+// Unauthenticated liveness probe for the dashboard connection banner.
+// Returns null when the backend cannot be reached at all.
+export async function checkBackendHealth(): Promise<HealthStatus | null> {
+  try {
+    const res = await fetch(apiUrl("/health"));
+    if (!res.ok) return { status: `http-${res.status}` };
+    return (await res.json()) as HealthStatus;
+  } catch {
+    return null;
+  }
+}
+
 // ── Governance API calls (backend remains the source of truth) ──
 export async function postIntercept(payload: InterceptRequest): Promise<InterceptResponse> {
-  const res = await fetch(apiUrl("/api/v1/transactions/intercept"), {
+  return request<InterceptResponse>("/api/v1/transactions/intercept", "Intercept transaction", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return handle<InterceptResponse>(res, "Intercept transaction");
 }
 
 export async function getTransactionDetail(txId: string): Promise<TransactionDetail> {
-  const res = await fetch(apiUrl(`/api/v1/transactions/${encodeURIComponent(txId)}`));
-  return handle<TransactionDetail>(res, "Load transaction detail");
+  return request<TransactionDetail>(
+    `/api/v1/transactions/${encodeURIComponent(txId)}`,
+    "Load transaction detail"
+  );
 }
 
 export async function getTransactionsHistory(limit = 50): Promise<TransactionDetail["transaction"][]> {
-  const res = await fetch(apiUrl(`/api/v1/transactions/history?limit=${limit}`));
-  return handle<TransactionDetail["transaction"][]>(res, "Load transaction history");
+  return request<TransactionDetail["transaction"][]>(
+    `/api/v1/transactions/history?limit=${limit}`,
+    "Load transaction history"
+  );
 }
 
 export async function getReviewQueue(): Promise<ReviewQueueItem[]> {
-  const res = await fetch(apiUrl("/api/v1/reviews/queue"));
-  return handle<ReviewQueueItem[]>(res, "Load review queue");
+  return request<ReviewQueueItem[]>("/api/v1/reviews/queue", "Load review queue");
 }
 
 export async function getAuditHistory(txId: string): Promise<AuditHistory> {
-  const res = await fetch(apiUrl(`/api/v1/audit/transaction/${encodeURIComponent(txId)}`));
-  return handle<AuditHistory>(res, "Load audit history");
+  return request<AuditHistory>(
+    `/api/v1/audit/transaction/${encodeURIComponent(txId)}`,
+    "Load audit history"
+  );
 }
 
 export async function verifyAuditChain(txId: string): Promise<AuditVerify> {
-  const res = await fetch(apiUrl(`/api/v1/audit/transaction/${encodeURIComponent(txId)}/verify`));
-  return handle<AuditVerify>(res, "Verify audit chain");
+  return request<AuditVerify>(
+    `/api/v1/audit/transaction/${encodeURIComponent(txId)}/verify`,
+    "Verify audit chain"
+  );
 }

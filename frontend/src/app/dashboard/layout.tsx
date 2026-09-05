@@ -6,12 +6,15 @@ import { usePathname } from "next/navigation";
 import "../../styles/tokens.css";
 import "../../styles/globals.css";
 import "reactflow/dist/style.css";
+import { API_BASE_URL, checkBackendHealth } from "@/lib/api";
 import {
   LayoutDashboard, ArrowRightLeft, GitBranch, Zap,
   Users, Bot, Shield, Brain, FileText, UserCheck,
   AlertTriangle, BarChart3, Settings, Search,
   Bell, Server, ChevronLeft, ChevronRight, Home, ShieldAlert, Cpu, Network, TestTube2, Layers
 } from "lucide-react";
+
+type BackendState = "checking" | "online" | "degraded" | "offline";
 
 // ── Sidebar Navigation Config ──────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -69,6 +72,37 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [backend, setBackend] = useState<BackendState>("checking");
+
+  // Liveness probe: the topbar badge and banner below reflect the real
+  // backend state instead of a hardcoded "Live" label.
+  React.useEffect(() => {
+    let cancelled = false;
+    async function probe() {
+      try {
+        const health = await checkBackendHealth();
+        if (cancelled) return;
+        if (health === null) setBackend("offline");
+        else if (health.status === "ok" || health.status === "healthy") setBackend("online");
+        else setBackend("degraded");
+      } catch {
+        if (!cancelled) setBackend("offline");
+      }
+    }
+    void probe();
+    const timer = setInterval(probe, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  const backendMeta: Record<BackendState, { label: string; dot: string; text: string }> = {
+    checking: { label: "Checking backend…", dot: "var(--gray-600)", text: "var(--text-muted)" },
+    online: { label: "Backend online", dot: "var(--accent-1)", text: "var(--text-3)" },
+    degraded: { label: "Backend degraded", dot: "var(--risk-medium-text)", text: "var(--risk-medium-text)" },
+    offline: { label: "Backend unreachable", dot: "var(--risk-critical-text)", text: "var(--risk-critical-text)" },
+  };
 
   return (
     <div
@@ -316,19 +350,20 @@ export default function DashboardLayout({
               border: "1px solid var(--border-1)",
               fontSize: 12,
               fontWeight: 500,
-              color: "var(--text-3)",
+              color: backendMeta[backend].text,
             }}
+            title={`Probed ${API_BASE_URL}/health`}
           >
             <span
               style={{
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: "var(--accent-1)",
+                background: backendMeta[backend].dot,
               }}
             />
             <Server size={11} />
-            <span>Live · Production</span>
+            <span>{backendMeta[backend].label}</span>
           </span>
           <button
             aria-label="Notifications"
@@ -376,6 +411,33 @@ export default function DashboardLayout({
             background: "var(--surface-0)",
           }}
         >
+          {backend === "offline" && (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 16,
+                padding: "12px 16px",
+                borderRadius: 10,
+                background: "var(--risk-critical-dim)",
+                border: "1px solid var(--risk-critical)",
+                fontSize: "var(--text-13)",
+                color: "var(--risk-critical-text)",
+                lineHeight: 1.6,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                Backend unreachable at {API_BASE_URL}
+              </div>
+              <div style={{ color: "var(--text-3)" }}>
+                1. Start it: <code style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>uvicorn app.main:app --port 8000</code> from{" "}
+                <code style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>backend/</code> (or{" "}
+                <code style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>docker compose up backend</code>).
+                2. Confirm <code style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{API_BASE_URL}/health</code> loads in this browser.
+                3. If it loads there but not here, add this page&apos;s origin to the backend&apos;s{" "}
+                <code style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>CORS_ORIGINS</code>.
+              </div>
+            </div>
+          )}
           {children}
         </main>
       </div>

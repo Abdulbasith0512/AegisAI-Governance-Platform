@@ -111,6 +111,11 @@ Create a `.env` file in the root directory:
 ```bash
 cp .env.example .env
 ```
+For local development with the dashboard, set `ALLOW_DEV_BYPASS=true` in `.env`
+(anonymous API access; never enable in production). For Docker, this is
+equivalent to adding it under the backend service's `environment:`.
+Ensure `CORS_ORIGINS` includes your frontend origin (default covers
+`http://localhost:3000`).
 
 ### 3. Migrate and Seed Databases
 ```bash
@@ -132,6 +137,19 @@ npm install
 npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### 6. Backend unreachable? ("Could not reach the transaction API")
+The dashboard topbar probes `GET /health` and shows `Backend online` or
+`Backend unreachable`. If unreachable:
+1. Start the backend first (step 4) and open `http://localhost:8000/health`
+   directly — JSON means the backend is up and the problem is URL/CORS config.
+2. Point the frontend at it: `NEXT_PUBLIC_API_URL=http://localhost:8000`
+   (baked at `next build` time — rebuild after changing it).
+3. If `/health` loads in one tab but the dashboard still fails, add the
+   dashboard origin to `CORS_ORIGINS` and restart the backend. Browser
+   devtools → Console → `Failed to fetch` also means down-or-CORS, while a
+   message with a status code (e.g. `401`) means the backend answered and
+   the fix is auth, not connectivity.
 
 ---
 
